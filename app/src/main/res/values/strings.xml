@@ -4,4 +4,6 @@
     <string name="cancel">キャンセル</string>
     <string name="input_mtod"></string>
     <string name="input_mbod"></string>
+    <string name="facebook_app_id">1531881133535274</string>
+    <string name="fb_login_protocol_scheme">fb1531881133535274</string>
 </resources>
