@@ -111,6 +111,7 @@ public class MenuActivity extends AppCompatActivity {
                                     // 何番目の書き込みか
                                     int article_num = i + 1;
                                     // 書き込みのメッセージを取得
+                                    // TODO トークン共有とグループ名との区別
                                     String message = groupObject[i].getString("message");
                                     // 「何番目」＋「メッセージ内容」をテキストに追加
                                     stringBuffer.append(article_num + "番目" + "\n");
