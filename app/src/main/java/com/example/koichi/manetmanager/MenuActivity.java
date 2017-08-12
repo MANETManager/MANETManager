@@ -108,11 +108,13 @@ public class MenuActivity extends AppCompatActivity {
                             for (int i=0; i<groupObject.length; i++){
                                 //messageデータを持っていない書き込み情報オブジェクトを排除する
                                 if(groupObject[i].has("message") == true) {
+                                    // i番目の書き込みについて処理を行う
+                                    // 書き込みのメッセージを取得
+                                    String message = groupObject[i].getString("message");
+
                                     // 何番目の書き込みか
                                     int article_num = i + 1;
-                                    // 書き込みのメッセージを取得
-                                    // TODO トークン共有とグループ名との区別
-                                    String message = groupObject[i].getString("message");
+
                                     // 「何番目」＋「メッセージ内容」をテキストに追加
                                     stringBuffer.append(article_num + "番目" + "\n");
                                     stringBuffer.append(message + "\n");
