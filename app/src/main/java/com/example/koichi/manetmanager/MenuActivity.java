@@ -87,7 +87,7 @@ public class MenuActivity extends AppCompatActivity {
                         // TextView 表示用のテキストバッファ
                         StringBuffer stringBuffer = new StringBuffer();
 
-                        //Log.i(TAG, response.getJSONObject().toString());
+                        // Log.i(TAG, response.getJSONObject().toString());
 
                         try {
                             //jsonオブジェクトを生成

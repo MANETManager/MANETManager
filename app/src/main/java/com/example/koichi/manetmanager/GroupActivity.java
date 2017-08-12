@@ -5,11 +5,14 @@ import android.graphics.Color;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
-
-import android.widget.ScrollView;
-import android.widget.TextView;
+import android.widget.Toast;
 
 import com.facebook.AccessToken;
 import com.facebook.GraphRequest;
@@ -27,10 +30,40 @@ public class GroupActivity extends AppCompatActivity {
     int group_MAX = 10;
     int group_num = 0; /*そのまま使えば存在グループ数、-1で一番最後のグループを指定*/
     String [] group_name = new String[group_MAX];
+    private static final String TAG = "GroupActivity";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        int MATCH_PARENT = ViewGroup.LayoutParams.MATCH_PARENT;
+        int WRAP_CONTENT = ViewGroup.LayoutParams.WRAP_CONTENT;
+
+        ScrollView scrollView = new ScrollView(this);
+        scrollView.setLayoutParams(new ScrollView.LayoutParams(
+                MATCH_PARENT, MATCH_PARENT));
+
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setLayoutParams(new LinearLayout.LayoutParams(
+                MATCH_PARENT, MATCH_PARENT));
+
+        //TODO ボタンを用意したはいいけど、これをいちいち呼び出すのが面倒です
+        //btnGroup[x]で指定できるわけでもない、さあどうする
+        Button btnGroup1 = (Button) findViewById(R.id.btnGroup1);
+        Button btnGroup2 = (Button) findViewById(R.id.btnGroup2);
+        Button btnGroup3 = (Button) findViewById(R.id.btnGroup3);
+        Button btnGroup4 = (Button) findViewById(R.id.btnGroup4);
+        Button btnGroup5 = (Button) findViewById(R.id.btnGroup5);
+        Button btnGroup6 = (Button) findViewById(R.id.btnGroup6);
+        Button btnGroup7 = (Button) findViewById(R.id.btnGroup7);
+        Button btnGroup8 = (Button) findViewById(R.id.btnGroup8);
+        Button btnGroup9 = (Button) findViewById(R.id.btnGroup9);
+        Button btnGroup10 = (Button) findViewById(R.id.btnGroup10);
+
+        // ScrollView に View を追加
+        scrollView.addView(layout);
+
         setContentView(R.layout.activity_group);
     }
 
@@ -38,6 +71,7 @@ public class GroupActivity extends AppCompatActivity {
     protected void onResume(){
         // スーパークラスのやることは済ませておく
         super.onResume();
+
         //GET
         GraphRequestAsyncTask graphRequestAsyncTask = new GraphRequest(
                 AccessToken.getCurrentAccessToken(),
@@ -48,8 +82,6 @@ public class GroupActivity extends AppCompatActivity {
                     public void onCompleted(GraphResponse response) {
                         // TextView 表示用のテキストバッファ
                         StringBuffer stringBuffer = new StringBuffer();
-
-                        //Log.i(TAG, response.getJSONObject().toString());
 
                         try {
                             //jsonオブジェクトを生成
@@ -67,6 +99,8 @@ public class GroupActivity extends AppCompatActivity {
                             // JSON 形式データ文字列にインデントを加えた形に成形
                             //parsedText = FBjson.toString(4);
 
+                            String judge = new String();
+
                             // data配列の書き込み情報オブジェクト群のうちmessageデータを取り出す
                             for (int i=0; i<groupObject.length; i++){
                                 //messageデータを持っていない書き込み情報オブジェクトを排除する
@@ -78,8 +112,11 @@ public class GroupActivity extends AppCompatActivity {
                                     // StringTokenizerオブジェクトの生成
                                     StringTokenizer st = new StringTokenizer(message , ",");
 
+                                    // 1つ目のトークンを先に取得
+                                    judge = st.nextToken();
+
                                     // トークンの1つ目によって動作を変える
-                                    if(st.nextToken().equals("1") == true)
+                                    if(judge.equals("1") == true)
                                     {
                                         // グループ情報についての書き込みだと認識する
                                         while(st.hasMoreTokens()) {
@@ -87,16 +124,26 @@ public class GroupActivity extends AppCompatActivity {
                                             // 次のトークンをグループ名と認識する
                                             if(group_num < group_MAX){
                                                 group_name[group_num] = st.nextToken();
-                                                group_num ++;
 
                                                 // テスト用
+                                                Log.i(TAG, "Test :" + group_name[group_num] + ": Test");
+
+                                                group_num ++;
+
                                                 // グループの「何番目」+「メッセージ内容」をテキストに追加
+                                                /*
                                                 stringBuffer.append("グループ" + group_num + "\n");
                                                 stringBuffer.append(group_name[group_num] + "\n");
+                                                */
                                             }
                                         }
+                                        Log.i(TAG, "Test: number of group is " + group_num + " :Test");
+                                        // このアクティビティでは最新のグループ名さえ取得できれば
+                                        // 他の書き込みに用がなくなるため、これ以降はbreakする
+                                        break;
+                                        // for (int i=0; i<groupObject.length; i++)がカットされるはず
 
-                                    } else if (st.nextToken().equals("2") == true) {
+                                    } else  if (judge.equals("2") == true) {
                                         // コミュニティトークンについての書き込みだと認識する
 
                                     } else {
@@ -104,12 +151,6 @@ public class GroupActivity extends AppCompatActivity {
 
                                     }
 
-                                    // 何番目の書き込みか
-                                    int article_num = i + 1;
-
-                                    // 「何番目」＋「メッセージ内容」をテキストに追加
-                                    stringBuffer.append(article_num + "番目" + "\n");
-                                    stringBuffer.append(message + "\n");
                                 }else {
                                     // 書き込みにメッセージが存在しないのでスルーする
 
@@ -120,15 +161,18 @@ public class GroupActivity extends AppCompatActivity {
                             //例外処理
                             e.printStackTrace();
                         }
-                        TextView textView = new TextView(getApplicationContext());
-                        textView.setHorizontallyScrolling(true);  // 行の折り返しをさせない
-                        textView.setText(stringBuffer);             // 成形した文字列を表示
-                        textView.setTextColor(Color.BLACK);  //文字色を黒に
-                        ScrollView scrollView = new ScrollView(getApplicationContext());
-                        scrollView.addView(textView);
-                        setContentView(scrollView, new ActionBar.LayoutParams(ActionBar.LayoutParams.FILL_PARENT, ActionBar.LayoutParams.FILL_PARENT));
+
+                        /*
+                      for(int j = group_num-1 ; j< group_MAX ; j++)
+                        {
+                            if (btnGroup1.getVisibility() != View.VISIBLE) {
+                                btnGroup1.setVisibility(View.VISIBLE);
+                            }
+                        }*/
+
                     }
                 }
         ).executeAsync();
+
     }
 }
