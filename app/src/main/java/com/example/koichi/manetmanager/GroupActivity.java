@@ -1,6 +1,7 @@
 package com.example.koichi.manetmanager;
 
 import android.content.Intent;
+import android.content.res.Resources;
 import android.graphics.Color;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
@@ -30,14 +31,17 @@ public class GroupActivity extends AppCompatActivity {
     int group_MAX = 10;
     int group_num = 0; /*そのまま使えば存在グループ数、-1で一番最後のグループを指定*/
     String [] group_name = new String[group_MAX];
+    Button btnGroup[]; //ボタン:メンバー変数
     private static final String TAG = "GroupActivity";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_group);
 
         int MATCH_PARENT = ViewGroup.LayoutParams.MATCH_PARENT;
-        int WRAP_CONTENT = ViewGroup.LayoutParams.WRAP_CONTENT;
+        int btnId; // ボタンのリソースIDを取得するためのint
+        String resBtnName; // Btnの要素名？を入れるためのString
 
         ScrollView scrollView = new ScrollView(this);
         scrollView.setLayoutParams(new ScrollView.LayoutParams(
@@ -48,23 +52,19 @@ public class GroupActivity extends AppCompatActivity {
         layout.setLayoutParams(new LinearLayout.LayoutParams(
                 MATCH_PARENT, MATCH_PARENT));
 
-        //TODO ボタンを用意したはいいけど、これをいちいち呼び出すのが面倒です
-        //btnGroup[x]で指定できるわけでもない、さあどうする
-        Button btnGroup1 = (Button) findViewById(R.id.btnGroup1);
-        Button btnGroup2 = (Button) findViewById(R.id.btnGroup2);
-        Button btnGroup3 = (Button) findViewById(R.id.btnGroup3);
-        Button btnGroup4 = (Button) findViewById(R.id.btnGroup4);
-        Button btnGroup5 = (Button) findViewById(R.id.btnGroup5);
-        Button btnGroup6 = (Button) findViewById(R.id.btnGroup6);
-        Button btnGroup7 = (Button) findViewById(R.id.btnGroup7);
-        Button btnGroup8 = (Button) findViewById(R.id.btnGroup8);
-        Button btnGroup9 = (Button) findViewById(R.id.btnGroup9);
-        Button btnGroup10 = (Button) findViewById(R.id.btnGroup10);
+        btnGroup = new Button[group_MAX];
+        //アプリケーションのResourcesオブジェクトを取得してresに入れる
+        Resources res = getResources();
+
+        for(int i = 0; i < group_MAX ; i++){
+            resBtnName = "btnGroup" + (i+1) ; //btnGroup1, btnGroup2, …
+            btnId = res.getIdentifier(resBtnName, "id", getPackageName()); //btnGroup1, btnGroup2, …のリソースID
+            //メンバー変数とリソースIDを結びつける
+            btnGroup[i] = (Button) findViewById(btnId);
+        }
 
         // ScrollView に View を追加
         scrollView.addView(layout);
-
-        setContentView(R.layout.activity_group);
     }
 
     @Override
@@ -81,7 +81,7 @@ public class GroupActivity extends AppCompatActivity {
                 new GraphRequest.Callback() {
                     public void onCompleted(GraphResponse response) {
                         // TextView 表示用のテキストバッファ
-                        StringBuffer stringBuffer = new StringBuffer();
+                        // StringBuffer stringBuffer = new StringBuffer();
 
                         try {
                             //jsonオブジェクトを生成
@@ -126,18 +126,25 @@ public class GroupActivity extends AppCompatActivity {
                                                 group_name[group_num] = st.nextToken();
 
                                                 // テスト用
-                                                Log.i(TAG, "Test :" + group_name[group_num] + ": Test");
+                                                // Log.i(TAG, "Test :" + group_name[group_num] + ": Test");
+
+                                                // btnGroup[i].setText(group_name[i]);
 
                                                 group_num ++;
-
-                                                // グループの「何番目」+「メッセージ内容」をテキストに追加
-                                                /*
-                                                stringBuffer.append("グループ" + group_num + "\n");
-                                                stringBuffer.append(group_name[group_num] + "\n");
-                                                */
                                             }
                                         }
-                                        Log.i(TAG, "Test: number of group is " + group_num + " :Test");
+                                        // setText変更した分を再描画
+                                        for(i=0;i<group_num;i++) {
+                                            btnGroup[i].setText(group_name[i]);
+                                        }
+                                        // 取得したグループ名の数よりも大きい番号のグループのボタンは不可視にする
+                                        for(int j=group_num;j<group_MAX;j++){
+                                            if (btnGroup[j].getVisibility() != View.INVISIBLE) {
+                                                btnGroup[j].setVisibility(View.INVISIBLE);
+                                            }
+                                        }
+
+                                        //Log.i(TAG, "Test: number of group is " + group_num + " :Test");
                                         // このアクティビティでは最新のグループ名さえ取得できれば
                                         // 他の書き込みに用がなくなるため、これ以降はbreakする
                                         break;
