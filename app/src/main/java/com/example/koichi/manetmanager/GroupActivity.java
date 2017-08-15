@@ -29,10 +29,10 @@ import java.util.StringTokenizer;
 
 public class GroupActivity extends AppCompatActivity {
     int group_MAX = 10;
-    int group_num = 0; /*そのまま使えば存在グループ数、-1で一番最後のグループを指定*/
+    int group_num = 0;
     String [] group_name = new String[group_MAX];
     Button btnGroup[]; //ボタン:メンバー変数
-    private static final String TAG = "GroupActivity";
+    //private static final String TAG = "GroupActivity";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -75,18 +75,15 @@ public class GroupActivity extends AppCompatActivity {
         //GET
         GraphRequestAsyncTask graphRequestAsyncTask = new GraphRequest(
                 AccessToken.getCurrentAccessToken(),
-                "/1752679538356004/feed",
+                "/me/groups",
                 null,
                 HttpMethod.GET,
                 new GraphRequest.Callback() {
                     public void onCompleted(GraphResponse response) {
-                        // TextView 表示用のテキストバッファ
-                        // StringBuffer stringBuffer = new StringBuffer();
-
                         try {
                             //jsonオブジェクトを生成
                             JSONObject FBjson = response.getJSONObject();
-
+                            //出てくるdata配列、pagingオブジェクトのうちdata配列を抽出
                             JSONArray itemArray = FBjson.getJSONArray("data");
 
                             //data配列内の全ての書き込み情報オブジェクトを取り出す
@@ -96,90 +93,33 @@ public class GroupActivity extends AppCompatActivity {
                                 groupObject[i] = itemArray.getJSONObject(i);
                             }
 
-                            // JSON 形式データ文字列にインデントを加えた形に成形
-                            //parsedText = FBjson.toString(4);
-
-                            String judge = new String();
-
-                            // data配列の書き込み情報オブジェクト群のうちmessageデータを取り出す
-                            for (int i=0; i<groupObject.length; i++){
-                                //messageデータを持っていない書き込み情報オブジェクトを排除する
-                                if(groupObject[i].has("message") == true) {
-                                    // i番目の書き込みについて処理を行う
-                                    // 書き込みのメッセージを取得
-                                    String message = groupObject[i].getString("message");
-
-                                    // StringTokenizerオブジェクトの生成
-                                    StringTokenizer st = new StringTokenizer(message , ",");
-
-                                    // 1つ目のトークンを先に取得
-                                    judge = st.nextToken();
-
-                                    // トークンの1つ目によって動作を変える
-                                    if(judge.equals("1") == true)
-                                    {
-                                        // グループ情報についての書き込みだと認識する
-                                        while(st.hasMoreTokens()) {
-                                            // StringTokenizerのトークンが残っているなら
-                                            // 次のトークンをグループ名と認識する
-                                            if(group_num < group_MAX){
-                                                group_name[group_num] = st.nextToken();
-
-                                                // テスト用
-                                                // Log.i(TAG, "Test :" + group_name[group_num] + ": Test");
-
-                                                // btnGroup[i].setText(group_name[i]);
-
-                                                group_num ++;
-                                            }
-                                        }
-                                        // setText変更した分を再描画
-                                        for(i=0;i<group_num;i++) {
-                                            btnGroup[i].setText(group_name[i]);
-                                        }
-                                        // 取得したグループ名の数よりも大きい番号のグループのボタンは不可視にする
-                                        for(int j=group_num;j<group_MAX;j++){
-                                            if (btnGroup[j].getVisibility() != View.INVISIBLE) {
-                                                btnGroup[j].setVisibility(View.INVISIBLE);
-                                            }
-                                        }
-
-                                        //Log.i(TAG, "Test: number of group is " + group_num + " :Test");
-                                        // このアクティビティでは最新のグループ名さえ取得できれば
-                                        // 他の書き込みに用がなくなるため、これ以降はbreakする
-                                        break;
-                                        // for (int i=0; i<groupObject.length; i++)がカットされるはず
-
-                                    } else  if (judge.equals("2") == true) {
-                                        // コミュニティトークンについての書き込みだと認識する
-
-                                    } else {
-                                        // 関係ない書き込みだと認識する
-
-                                    }
-
+                            // data配列の書き込み情報オブジェクト群のうちnameデータ・idデータを取り出す
+                            for (group_num=0; group_num<groupObject.length && group_num < group_MAX; group_num++){
+                                //nameデータ・idデータを持っていない書き込み情報オブジェクトを排除する
+                                if(groupObject[group_num].has("name") == true && groupObject[group_num].has("id") == true) {
+                                    // (i+1)番目の書き込みについて処理を行う
+                                    // グループ名を取得
+                                    group_name[group_num] = groupObject[group_num].getString("name");
                                 }else {
-                                    // 書き込みにメッセージが存在しないのでスルーする
-
+                                    // 書き込みにname・idが存在しないのでスルーする
                                 }
                             }
-
+                            // setText変更した分を再描画
+                            for(int i=0;i<group_num;i++) {
+                                btnGroup[i].setText(group_name[i]);
+                            }
+                            // 取得したグループ名の数よりも大きい番号のグループのボタンは不可視にする
+                            for(int j=group_num;j<group_MAX;j++){
+                                if (btnGroup[j].getVisibility() != View.INVISIBLE) {
+                                    btnGroup[j].setVisibility(View.INVISIBLE);
+                                }
+                            }
                         } catch (JSONException e) {
-                            //例外処理
+                            //jsonオブジェクトの解析に失敗した場合の例外処理
                             e.printStackTrace();
                         }
-
-                        /*
-                      for(int j = group_num-1 ; j< group_MAX ; j++)
-                        {
-                            if (btnGroup1.getVisibility() != View.VISIBLE) {
-                                btnGroup1.setVisibility(View.VISIBLE);
-                            }
-                        }*/
-
                     }
                 }
         ).executeAsync();
-
     }
 }
