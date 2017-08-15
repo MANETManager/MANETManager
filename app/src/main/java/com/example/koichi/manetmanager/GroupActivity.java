@@ -25,14 +25,17 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.StringTokenizer;
 
 public class GroupActivity extends AppCompatActivity {
     int group_MAX = 10;
     int group_num = 0;
     String [] group_name = new String[group_MAX];
+    String [] group_id = new String[group_MAX];
     Button btnGroup[]; //ボタン:メンバー変数
-    //private static final String TAG = "GroupActivity";
+    private static final String TAG = "GroupActivity";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,6 +64,24 @@ public class GroupActivity extends AppCompatActivity {
             btnId = res.getIdentifier(resBtnName, "id", getPackageName()); //btnGroup1, btnGroup2, …のリソースID
             //メンバー変数とリソースIDを結びつける
             btnGroup[i] = (Button) findViewById(btnId);
+            //ボタンにクリックリスナーを設定
+            btnGroup[i].setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Button btn = (Button) v; // クリックされたボタンをキャスト
+                    String btn_text = btn.getText().toString(); // ボタンに設定している文字列を取得
+
+                    List<String> list = Arrays.asList(group_name); //グループ名配列をList型オブジェクトに変換
+                    int i = list.indexOf(btn_text);
+
+                    Intent intent = new Intent(getApplication(), GDetailActivity.class);
+                    intent.putExtra("group_name", group_name[i]);
+                    intent.putExtra("group_id", group_id[i]);
+                    startActivity(intent);
+
+                    //Log.i(TAG, "TEST: " + group_name[i]);
+                }
+            });
         }
 
         // ScrollView に View を追加
@@ -98,8 +119,9 @@ public class GroupActivity extends AppCompatActivity {
                                 //nameデータ・idデータを持っていない書き込み情報オブジェクトを排除する
                                 if(groupObject[group_num].has("name") == true && groupObject[group_num].has("id") == true) {
                                     // (i+1)番目の書き込みについて処理を行う
-                                    // グループ名を取得
+                                    // グループ名とグループidを取得
                                     group_name[group_num] = groupObject[group_num].getString("name");
+                                    group_id[group_num] = groupObject[group_num].getString("id");
                                 }else {
                                     // 書き込みにname・idが存在しないのでスルーする
                                 }
