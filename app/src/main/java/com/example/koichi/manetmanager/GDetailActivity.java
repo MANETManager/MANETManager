@@ -372,6 +372,7 @@ public class GDetailActivity extends AppCompatActivity {
                         Log.d(TAG, "postToFB(): " + postid);
                         Toast.makeText(GDetailActivity.this, "コミュニティトークンを作成しました", Toast.LENGTH_LONG).show();
                         //btn_Create.setVisibility(View.GONE);
+                        startService(new Intent(getBaseContext(),MANETManageService.class));
                         viewOfMaketoken(0);
 
                         TokenMADEby = 1;
@@ -406,6 +407,7 @@ public class GDetailActivity extends AppCompatActivity {
                         Toast.makeText(GDetailActivity.this, "コミュニティトークンを削除しました", Toast.LENGTH_LONG).show();
                         btn_Delete.setVisibility(View.GONE);
                         TokenMADEby = 0;
+                        stopService(new Intent(getBaseContext(),MANETManageService.class));
                         readFromFBgroup();
                     }
                 }
