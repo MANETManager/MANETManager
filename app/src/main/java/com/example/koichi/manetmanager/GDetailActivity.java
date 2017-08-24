@@ -5,7 +5,10 @@ import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -33,22 +36,11 @@ import java.util.StringTokenizer;
  */
 
 public class GDetailActivity extends AppCompatActivity {
-    private TextView tv_groupname;
-    private TextView tv_groupid;
-    private TextView tv_tokenid;
-    private TextView tv_mb;
-    private TextView tv_mt;
-    private TextView tv_saddress;
-    private Button btn_Create;
-    private Button btn_Delete;
+    private TextView tv_groupname, tv_groupid, tv_tokenid, tv_mb, tv_mt, tv_saddress, noticeMakeToken, MTMaketoken, MBMaketoken;
+    private Button btn_Create, btn_Delete;
+    private Spinner spinner_MT, spinner_MB;
     int TokenMADEby = 0;
-    String group_id;
-    String group_name;
-    String group_tokenid;
-    String group_mb;
-    String group_mt;
-    String group_saddress;
-    String postid;
+    String group_id, group_name, group_tokenid, group_mb, group_mt, group_saddress, postid;
     private static final String TAG = "GDetailActivity";
     CallbackManager callbackManager;
 
@@ -63,15 +55,21 @@ public class GDetailActivity extends AppCompatActivity {
         // intent.putExtra("group_name", group_id[i]); を取得
         group_id = intent.getStringExtra("group_id");
 
-        tv_groupname = (TextView)findViewById(R.id.tv_groupname);
+        tv_groupname = (TextView) findViewById(R.id.tv_groupname);
         tv_groupid = (TextView) findViewById(R.id.tv_groupid);
         tv_tokenid = (TextView) findViewById(R.id.tv_tokenid);
         tv_mb = (TextView) findViewById(R.id.tv_mb);
         tv_mt = (TextView) findViewById(R.id.tv_mt);
         tv_saddress = (TextView) findViewById(R.id.tv_saddress);
+        noticeMakeToken = (TextView) findViewById(R.id.textView7);
+        MTMaketoken = (TextView) findViewById(R.id.textView8);
+        MBMaketoken = (TextView) findViewById(R.id.textView9);
 
         btn_Create = (Button) findViewById(R.id.btnCreate);
         btn_Delete = (Button) findViewById(R.id.btnDelete);
+
+        spinner_MT = (Spinner) findViewById(R.id.spinner_MT);
+        spinner_MB = (Spinner) findViewById(R.id.spinner_MB);
 
         // コミュニティトークン作成ボタンにクリックリスナー
         btn_Create.setOnClickListener(new View.OnClickListener() {
@@ -268,16 +266,10 @@ public class GDetailActivity extends AppCompatActivity {
                                 }
 
                                 // →コミュニティトークンを作成するためのボタンを表示
-                                btn_Create.setVisibility(View.VISIBLE);
+                                //btn_Create.setVisibility(View.VISIBLE);
+                                viewOfMaketoken(1);
                             }else {
                                 // コミュニティトークンが存在する
-                                // postToFBから戻ってきた場合、コミュニティトークン作成ボタンを消去する
-
-                                /*
-                                if (btn_Create.getVisibility() != View.GONE)
-                                {btn_Create.setVisibility(View.GONE);}
-                                */
-
                                 // そのコミュニティトークンを自らが作成したかを判別する
                                 if(TokenMADEby == 1 ){
                                     // 自分が作った
@@ -332,10 +324,22 @@ public class GDetailActivity extends AppCompatActivity {
     // コミュニティトークンを作成してグループへアップロードするクラス
     void postToFB(){
         // コミュニティトークンに必要な端末情報を取得
-        // ※08/16現在、端末設定が実装されていないので適当な値を設定
+        // Spinnerから選択したアイテムを取得する
+        Spinner item_MB = (Spinner) findViewById(R.id.spinner_MB);
+        Spinner item_MT = (Spinner) findViewById(R.id.spinner_MT);
+
+        String up_mb = (String) item_MB.getSelectedItem();
+        if(up_mb != null && up_mb.length() > 0){
+            up_mb = up_mb.substring(0, up_mb.length()-1);
+        }else Log.d(TAG, "postToFB(): error occurred while getting item_MB!");
+
+        String up_mt = (String) item_MT.getSelectedItem();
+        if(up_mt != null && up_mt.length() > 0){
+            up_mt = up_mt.substring(0, up_mt.length()-1);
+        }else Log.d(TAG, "postToFB(): error occurred while getting item_MT!");
+
+        // ※08/16現在、端末設定が実装されていないのでMACアドレスには適当な値を設定
         String up_tokenid = "00:00:00:00:00:00";
-        String up_mb = "10";
-        String up_mt = "10";
         String up_saddress = "00:00:00:00:00:00";
 
         // コミュニティトークンをアップロードするための文字列を作成する
@@ -367,7 +371,9 @@ public class GDetailActivity extends AppCompatActivity {
                         }
                         Log.d(TAG, "postToFB(): " + postid);
                         Toast.makeText(GDetailActivity.this, "コミュニティトークンを作成しました", Toast.LENGTH_LONG).show();
-                        btn_Create.setVisibility(View.GONE);
+                        //btn_Create.setVisibility(View.GONE);
+                        viewOfMaketoken(0);
+
                         TokenMADEby = 1;
                         readFromFBgroup();
                     }
@@ -404,6 +410,34 @@ public class GDetailActivity extends AppCompatActivity {
                     }
                 }
         ).executeAsync();
+    }
+
+    //コミュニティトークン作成に関するViewの可視不可視を変更するためのクラス
+    //selectorはviewを表示する( = 1)か表示しない( = 0)かを指定するために用いる
+    void viewOfMaketoken(int selector){
+        switch (selector){
+            case 0:
+                //viewを非表示にする
+                btn_Create.setVisibility(View.GONE);
+                noticeMakeToken.setVisibility(View.GONE);
+                MBMaketoken.setVisibility(View.GONE);
+                spinner_MB.setVisibility(View.GONE);
+                MTMaketoken.setVisibility(View.GONE);
+                spinner_MT.setVisibility(View.GONE);
+                break;
+            case 1:
+                //viewを表示する
+                btn_Create.setVisibility(View.VISIBLE);
+                noticeMakeToken.setVisibility(View.VISIBLE);
+                MBMaketoken.setVisibility(View.VISIBLE);
+                spinner_MB.setVisibility(View.VISIBLE);
+                MTMaketoken.setVisibility(View.VISIBLE);
+                spinner_MT.setVisibility(View.VISIBLE);
+                break;
+            default:
+                Log.d(TAG, "viewOfMaketoken: selectorに予期せぬ値が代入されました");
+                Toast.makeText(GDetailActivity.this, "Error occurred", Toast.LENGTH_SHORT).show();
+        }
     }
 
 }
