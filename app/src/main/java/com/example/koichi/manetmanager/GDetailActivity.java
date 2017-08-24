@@ -330,12 +330,12 @@ public class GDetailActivity extends AppCompatActivity {
 
         String up_mb = (String) item_MB.getSelectedItem();
         if(up_mb != null && up_mb.length() > 0){
-            up_mb = up_mb.substring(0, up_mb.length()-1);
+            up_mb = up_mb.substring(0, 2);
         }else Log.d(TAG, "postToFB(): error occurred while getting item_MB!");
 
         String up_mt = (String) item_MT.getSelectedItem();
         if(up_mt != null && up_mt.length() > 0){
-            up_mt = up_mt.substring(0, up_mt.length()-1);
+            up_mt = up_mt.substring(0, 2);
         }else Log.d(TAG, "postToFB(): error occurred while getting item_MT!");
 
         // ※08/16現在、端末設定が実装されていないのでMACアドレスには適当な値を設定
