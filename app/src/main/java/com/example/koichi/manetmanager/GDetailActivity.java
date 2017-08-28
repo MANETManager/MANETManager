@@ -5,7 +5,10 @@ import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -33,15 +36,11 @@ import java.util.StringTokenizer;
  */
 
 public class GDetailActivity extends AppCompatActivity {
-    private TextView tv_groupname;
-    private TextView tv_groupid;
-    private TextView tv_tokenid;
-    private TextView tv_mb;
-    private TextView tv_mt;
-    private TextView tv_saddress;
-    private Button btn_Create;
-    String group_id;
-    String group_name;
+    private TextView tv_groupname, tv_groupid, tv_tokenid, tv_mb, tv_mt, tv_saddress, noticeMakeToken, MTMaketoken, MBMaketoken;
+    private Button btn_Create, btn_Delete;
+    private Spinner spinner_MT, spinner_MB;
+    int TokenMADEby = 0;
+    String group_id, group_name, group_tokenid, group_mb, group_mt, group_saddress, postid;
     private static final String TAG = "GDetailActivity";
     CallbackManager callbackManager;
 
@@ -56,20 +55,27 @@ public class GDetailActivity extends AppCompatActivity {
         // intent.putExtra("group_name", group_id[i]); を取得
         group_id = intent.getStringExtra("group_id");
 
-        tv_groupname = (TextView)findViewById(R.id.tv_groupname);
+        tv_groupname = (TextView) findViewById(R.id.tv_groupname);
         tv_groupid = (TextView) findViewById(R.id.tv_groupid);
         tv_tokenid = (TextView) findViewById(R.id.tv_tokenid);
         tv_mb = (TextView) findViewById(R.id.tv_mb);
         tv_mt = (TextView) findViewById(R.id.tv_mt);
         tv_saddress = (TextView) findViewById(R.id.tv_saddress);
+        noticeMakeToken = (TextView) findViewById(R.id.textView7);
+        MTMaketoken = (TextView) findViewById(R.id.textView8);
+        MBMaketoken = (TextView) findViewById(R.id.textView9);
 
         btn_Create = (Button) findViewById(R.id.btnCreate);
+        btn_Delete = (Button) findViewById(R.id.btnDelete);
+
+        spinner_MT = (Spinner) findViewById(R.id.spinner_MT);
+        spinner_MB = (Spinner) findViewById(R.id.spinner_MB);
 
         // コミュニティトークン作成ボタンにクリックリスナー
         btn_Create.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-
+                //パーミッションを持っているか確かめる
                 final Bundle permBundle = new Bundle();
                 permBundle.putCharSequence("permission", "publish_actions");
                 GraphRequest request = new GraphRequest(
@@ -78,34 +84,76 @@ public class GDetailActivity extends AppCompatActivity {
                         new GraphRequest.Callback() {
                             @Override
                             public void onCompleted(GraphResponse graphResponse) {
-                                Log.d(TAG, "response2: " + graphResponse.getJSONObject());
+                                Log.d(TAG, "btn_Create.setOnClickListener: response2: " + graphResponse.getJSONObject());
                                 try {
                                     JSONArray permList = (JSONArray) graphResponse.getJSONObject().get("data");
                                     if(permList.length() == 0){
-                                        // no data for perms, hence asking permission
-                                        askForFBPublishPerm();
+                                        // パーミッションが無いので取得する
+                                        askForFBPublishPerm(1);
                                     }else{
                                         JSONObject permData = (JSONObject) permList.get(0);
                                         String permVal = (String) permData.get("status");
                                         if(permVal.equals("granted")){
+                                            // パーミッションがあるので投稿する
                                             postToFB();
                                         }else{
-                                            askForFBPublishPerm();
+                                            // パーミッションが足りないので取得する
+                                            askForFBPublishPerm(1);
                                         }
                                     }
                                 } catch (JSONException e) {
-                                    Log.d(TAG, "exception while parsing fb check perm data" + e.toString());
+                                    Log.d(TAG, "btn_Create.setOnClickListener: exception while parsing fb check perm data" + e.toString());
                                     Toast.makeText(GDetailActivity.this, "Error occurred while connecting", Toast.LENGTH_SHORT).show();
                                 }
-
                             }
                         }
                 ); //GraphRequest request = new GraphRequest(
                 request.executeAsync();
-
             }
         });
         // btn_Create.setOnClickListenerここまで
+
+        // コミュニティトークン削除ボタンにクリックリスナー
+        btn_Delete.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                //パーミッションを持っているか確かめる
+                final Bundle permBundle = new Bundle();
+                permBundle.putCharSequence("permission", "publish_actions");
+                GraphRequest request = new GraphRequest(
+                        AccessToken.getCurrentAccessToken(),
+                        "/me/permissions", permBundle, HttpMethod.GET,
+                        new GraphRequest.Callback() {
+                            @Override
+                            public void onCompleted(GraphResponse graphResponse) {
+                                Log.d(TAG, "btn_Delete.setOnClickListener: response2: " + graphResponse.getJSONObject());
+                                try {
+                                    JSONArray permList = (JSONArray) graphResponse.getJSONObject().get("data");
+                                    if(permList.length() == 0){
+                                        // パーミッションが無いので取得する
+                                        askForFBPublishPerm(2);
+                                    }else{
+                                        JSONObject permData = (JSONObject) permList.get(0);
+                                        String permVal = (String) permData.get("status");
+                                        if(permVal.equals("granted")){
+                                            // パーミッションがあるので削除する
+                                            deleteToFB();
+                                        }else{
+                                            // パーミッションが足りないので取得する
+                                            askForFBPublishPerm(2);
+                                        }
+                                    }
+                                } catch (JSONException e) {
+                                    Log.d(TAG, "btn_Delete.setOnClickListener: exception while parsing fb check perm data" + e.toString());
+                                    Toast.makeText(GDetailActivity.this, "Error occurred while connecting", Toast.LENGTH_SHORT).show();
+                                }
+                            }
+                        }
+                ); //GraphRequest request = new GraphRequest(
+                request.executeAsync();
+            }
+        });
+        // btn_Delete.setOnClickListenerここまで
 
         // グループ名とidをsetText
         tv_groupname.setText(group_name);
@@ -117,7 +165,13 @@ public class GDetailActivity extends AppCompatActivity {
     protected void onResume(){
         // スーパークラスのやることは済ませておく
         super.onResume();
+        // グループ詳細画面を開く度にFBグループからCトークンを取得してみる
+        readFromFBgroup();
+    }
 
+    // グループidを受け取ってコミュニティトークンを探しに行くクラス
+    // onResumeクラスで毎回起動、postToFBクラスでCトークンをアップロードした後に起動
+    void readFromFBgroup(){
         //GET
         GraphRequestAsyncTask graphRequestAsyncTask = new GraphRequest(
                 AccessToken.getCurrentAccessToken(),
@@ -167,16 +221,24 @@ public class GDetailActivity extends AppCompatActivity {
                                         TokenEXIST = 1; //コミュニティトークンが存在するので1にする
 
                                         // コミュニティトークンの内容を読み込む
-                                        /*while(st.hasMoreTokens()) {
+                                        group_id = st.nextToken(); //値が変わらないとは思うけど念のため
+                                        group_tokenid = st.nextToken();
+                                        group_mb = st.nextToken();
+                                        group_mt = st.nextToken();
+                                        group_saddress = st.nextToken();
 
-                                        }*/
+                                        // コミュニティトークンの内容をsetText
+                                        //tv_groupid.setText(group_id);
+                                        tv_tokenid.setText(group_tokenid);
+                                        tv_mb.setText(group_mb);
+                                        tv_mt.setText(group_mt);
+                                        tv_saddress.setText(group_saddress);
+
                                         // このアクティビティでは最新のコミュニティトークンさえ取得できれば
                                         // 他の書き込みに用がなくなるため、これ以降はbreakする
                                         break;
-                                        // for (int i=0; i<groupObject.length; i++)がカットされるはず
 
                                     } else{
-                                        // if(judge.equals("1") == true)
                                         // コミュニティトークンとは関係ない書き込みだと認識する
                                     }
                                 }else {
@@ -190,17 +252,33 @@ public class GDetailActivity extends AppCompatActivity {
                             // グループにコミュニティトークンが存在したか否かを判断する
                             if(TokenEXIST != 1){
                                 // コミュニティトークンが存在しない
+                                // →自らの持っているコミュニティトークンの情報を破棄し、画面表示に反映する
+                                if(group_tokenid != "null") {
+                                    group_tokenid = "null";
+                                    group_mb = "null";
+                                    group_mt = "null";
+                                    group_saddress = "null";
+
+                                    tv_tokenid.setText(group_tokenid);
+                                    tv_mb.setText(group_mb);
+                                    tv_mt.setText(group_mt);
+                                    tv_saddress.setText(group_saddress);
+                                }
+
                                 // →コミュニティトークンを作成するためのボタンを表示
-                                btn_Create.setVisibility(View.VISIBLE);
+                                //btn_Create.setVisibility(View.VISIBLE);
+                                viewOfMaketoken(1);
                             }else {
                                 // コミュニティトークンが存在する
                                 // そのコミュニティトークンを自らが作成したかを判別する
-
-                                // 自分が作った
-                                // コミュニティトークンを削除とかできるようなボタンを表示
-
-                                // 自分が作っていない
-                                // 特にコミュニティトークン自体に介入できる余地がないのでなにもしない
+                                if(TokenMADEby == 1 ){
+                                    // 自分が作った
+                                    // コミュニティトークンを削除するボタンを表示
+                                    btn_Delete.setVisibility(View.VISIBLE);
+                                } else {
+                                    // 自分が作っていない場合、
+                                    // 特にコミュニティトークンに介入できる余地がないのでなにもしない
+                                }
                             }
                         } catch (JSONException e) {
                             //responseが取得できなかった場合（インターネットに接続できていない等）
@@ -209,10 +287,12 @@ public class GDetailActivity extends AppCompatActivity {
                     }
                 }
         ).executeAsync();
-
     }
 
-    void askForFBPublishPerm(){
+    // FBからメッセージPOSTのためのパーミッションを取得する
+    // chooseDoingは次にCトークンを作成するか削除するかを指定するために用いる
+    // 作成なら1, 削除なら2
+    void askForFBPublishPerm(final int chooseDoing){
         Log.d(TAG, "asking for the permissions");
         callbackManager = CallbackManager.Factory.create();
         LoginManager.getInstance().logInWithPublishPermissions(
@@ -222,7 +302,11 @@ public class GDetailActivity extends AppCompatActivity {
         LoginManager.getInstance().registerCallback(callbackManager, new FacebookCallback<LoginResult>() {
             @Override
             public void onSuccess(LoginResult loginResult) {
-                postToFB();
+                if(chooseDoing == 1) {
+                    postToFB();
+                } else if (chooseDoing == 2){
+                    deleteToFB();
+                }
             }
 
             @Override
@@ -237,12 +321,25 @@ public class GDetailActivity extends AppCompatActivity {
         });
     }
 
+    // コミュニティトークンを作成してグループへアップロードするクラス
     void postToFB(){
         // コミュニティトークンに必要な端末情報を取得
-        // ※08/16現在、端末設定が実装されていないので適当な値を設定
+        // Spinnerから選択したアイテムを取得する
+        Spinner item_MB = (Spinner) findViewById(R.id.spinner_MB);
+        Spinner item_MT = (Spinner) findViewById(R.id.spinner_MT);
+
+        String up_mb = (String) item_MB.getSelectedItem();
+        if(up_mb != null && up_mb.length() > 0){
+            up_mb = up_mb.substring(0, 2);
+        }else Log.d(TAG, "postToFB(): error occurred while getting item_MB!");
+
+        String up_mt = (String) item_MT.getSelectedItem();
+        if(up_mt != null && up_mt.length() > 0){
+            up_mt = up_mt.substring(0, 2);
+        }else Log.d(TAG, "postToFB(): error occurred while getting item_MT!");
+
+        // ※08/16現在、端末設定が実装されていないのでMACアドレスには適当な値を設定
         String up_tokenid = "00:00:00:00:00:00";
-        String up_mb = "10";
-        String up_mt = "10";
         String up_saddress = "00:00:00:00:00:00";
 
         // コミュニティトークンをアップロードするための文字列を作成する
@@ -262,11 +359,87 @@ public class GDetailActivity extends AppCompatActivity {
                 HttpMethod.POST,
                 new GraphRequest.Callback() {
                     public void onCompleted(GraphResponse response) {
-                        Log.i(TAG, response.getJSONObject().toString());
+                        try {
+                            JSONObject FBjson = response.getJSONObject();
+                            if(FBjson.has("id") == true) {
+                                postid = FBjson.getString("id");
+                            }
+                        } catch (JSONException e) {
+                            //responseが取得できなかった場合（インターネットに接続できていない等）
+                            e.printStackTrace();
+                            Log.e("MYAPP", "unexpected JSON exception", e);
+                        }
+                        Log.d(TAG, "postToFB(): " + postid);
                         Toast.makeText(GDetailActivity.this, "コミュニティトークンを作成しました", Toast.LENGTH_LONG).show();
+                        //btn_Create.setVisibility(View.GONE);
+                        startService(new Intent(getBaseContext(),MANETManageService.class));
+                        viewOfMaketoken(0);
+
+                        TokenMADEby = 1;
+                        readFromFBgroup();
                     }
                 }
         ).executeAsync();
+    }
+
+    // グループ上のコミュニティトークンを削除するクラス
+    void deleteToFB(){
+        new GraphRequest(
+                AccessToken.getCurrentAccessToken(),
+                "/"+ postid,
+                null,
+                HttpMethod.DELETE,
+                new GraphRequest.Callback() {
+                    public void onCompleted(GraphResponse response) {
+                        /*
+                        try {
+                            JSONObject FBjson = response.getJSONObject();
+                            if(FBjson.has("id") == true) {
+                                postid = FBjson.getString("id");
+                            }
+                        } catch (JSONException e) {
+                            //responseが取得できなかった場合（インターネットに接続できていない等）
+                            e.printStackTrace();
+                            Log.e("MYAPP", "unexpected JSON exception", e);
+                        }
+                        */
+                        Log.d(TAG, "deleteToFB(): " + response.getJSONObject());
+                        Toast.makeText(GDetailActivity.this, "コミュニティトークンを削除しました", Toast.LENGTH_LONG).show();
+                        btn_Delete.setVisibility(View.GONE);
+                        TokenMADEby = 0;
+                        stopService(new Intent(getBaseContext(),MANETManageService.class));
+                        readFromFBgroup();
+                    }
+                }
+        ).executeAsync();
+    }
+
+    //コミュニティトークン作成に関するViewの可視不可視を変更するためのクラス
+    //selectorはviewを表示する( = 1)か表示しない( = 0)かを指定するために用いる
+    void viewOfMaketoken(int selector){
+        switch (selector){
+            case 0:
+                //viewを非表示にする
+                btn_Create.setVisibility(View.GONE);
+                noticeMakeToken.setVisibility(View.GONE);
+                MBMaketoken.setVisibility(View.GONE);
+                spinner_MB.setVisibility(View.GONE);
+                MTMaketoken.setVisibility(View.GONE);
+                spinner_MT.setVisibility(View.GONE);
+                break;
+            case 1:
+                //viewを表示する
+                btn_Create.setVisibility(View.VISIBLE);
+                noticeMakeToken.setVisibility(View.VISIBLE);
+                MBMaketoken.setVisibility(View.VISIBLE);
+                spinner_MB.setVisibility(View.VISIBLE);
+                MTMaketoken.setVisibility(View.VISIBLE);
+                spinner_MT.setVisibility(View.VISIBLE);
+                break;
+            default:
+                Log.d(TAG, "viewOfMaketoken: selectorに予期せぬ値が代入されました");
+                Toast.makeText(GDetailActivity.this, "Error occurred", Toast.LENGTH_SHORT).show();
+        }
     }
 
 }
