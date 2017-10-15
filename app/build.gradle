@@ -36,5 +36,8 @@ dependencies {
     compile 'com.android.support:customtabs:26.0.0-alpha1'
     compile 'com.android.support.constraint:constraint-layout:1.0.2'
     compile 'junit:junit:4.12'
+    //Facebook SDK
     compile 'com.facebook.android:facebook-android-sdk:[4,5)'
+    //Google Play Services SDK の中のnearbyに関するものだけを部分的にコンパイル
+    compile 'com.google.android.gms:play-services-nearby:11.4.0'
 }

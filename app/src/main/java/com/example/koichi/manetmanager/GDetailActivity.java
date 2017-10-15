@@ -1,6 +1,8 @@
 package com.example.koichi.manetmanager;
 
+import android.Manifest;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
@@ -11,6 +13,7 @@ import android.widget.Button;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
+
 
 import com.facebook.AccessToken;
 import com.facebook.CallbackManager;
@@ -31,11 +34,16 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.StringTokenizer;
 
+import android.app.ActivityManager;
+import android.app.ActivityManager.RunningServiceInfo;
+
 /**
  * Created by Takami_res on 2017/08/15.
  */
 
 public class GDetailActivity extends AppCompatActivity {
+    private static final int MY_PERMISSIONS_ACCESS_COARSE_LOCATION = 1;
+
     private TextView tv_groupname, tv_groupid, tv_tokenid, tv_mb, tv_mt, tv_saddress, noticeMakeToken, MTMaketoken, MBMaketoken;
     private Button btn_Create, btn_Delete;
     private Spinner spinner_MT, spinner_MB;
@@ -75,40 +83,10 @@ public class GDetailActivity extends AppCompatActivity {
         btn_Create.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                //パーミッションを持っているか確かめる
-                final Bundle permBundle = new Bundle();
-                permBundle.putCharSequence("permission", "publish_actions");
-                GraphRequest request = new GraphRequest(
-                        AccessToken.getCurrentAccessToken(),
-                        "/me/permissions", permBundle, HttpMethod.GET,
-                        new GraphRequest.Callback() {
-                            @Override
-                            public void onCompleted(GraphResponse graphResponse) {
-                                Log.d(TAG, "btn_Create.setOnClickListener: response2: " + graphResponse.getJSONObject());
-                                try {
-                                    JSONArray permList = (JSONArray) graphResponse.getJSONObject().get("data");
-                                    if(permList.length() == 0){
-                                        // パーミッションが無いので取得する
-                                        askForFBPublishPerm(1);
-                                    }else{
-                                        JSONObject permData = (JSONObject) permList.get(0);
-                                        String permVal = (String) permData.get("status");
-                                        if(permVal.equals("granted")){
-                                            // パーミッションがあるので投稿する
-                                            postToFB();
-                                        }else{
-                                            // パーミッションが足りないので取得する
-                                            askForFBPublishPerm(1);
-                                        }
-                                    }
-                                } catch (JSONException e) {
-                                    Log.d(TAG, "btn_Create.setOnClickListener: exception while parsing fb check perm data" + e.toString());
-                                    Toast.makeText(GDetailActivity.this, "Error occurred while connecting", Toast.LENGTH_SHORT).show();
-                                }
-                            }
-                        }
-                ); //GraphRequest request = new GraphRequest(
-                request.executeAsync();
+                // まずはAndroidアプリのパーミッション許可を確認する
+                // その後、Facebook側の投稿パーミッション許可を確認する
+                // 両方が許可されれば、postToFB()→startNearbyConnections()を順に呼び出す
+                requestAppPermissions(true);
             }
         });
         // btn_Create.setOnClickListenerここまで
@@ -159,6 +137,96 @@ public class GDetailActivity extends AppCompatActivity {
         tv_groupname.setText(group_name);
         tv_groupid.setText(group_id);
 
+    }
+
+    /* boolean posting: trueならこの後にFacebookへの投稿も行う、falseならこの後にMANETManageServiceを起動する */
+    // TODO もしも自分がコミュニティトークン作成者ならFacebookに投稿する
+
+    void requestAppPermissions(boolean posting){
+        // Androidアプリのパーミッションを付与しているか確かめる
+        // (NearbyConnectionsで用いるBluetooth,WiFi,現在地）
+        // Android 6.0以上の場合
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            // 位置情報の取得が許可されているかチェック
+            if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(GDetailActivity.this, "位置情報の取得は既に許可されています", Toast.LENGTH_SHORT).show();
+                // 権限があるので次に進む
+                if(posting == true)
+                {
+                    getFacebookPermission();
+                }else {
+                    startNearbyConnections();
+                }/* if(posting == true) */
+            } else {
+                // なければ権限を求めるダイアログを表示
+                requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},
+                        MY_PERMISSIONS_ACCESS_COARSE_LOCATION);
+                // この後、許可拒否に関わらずonRequestPermissionsResult()が呼び出される
+            }
+            // Android 6.0以下の場合
+        } else {
+            // インストール時点で許可されているのでチェックの必要なし
+            Toast.makeText(GDetailActivity.this, "位置情報の取得は既に許可されています(Android 5.0以下です)", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
+        switch (requestCode) {
+            // 先ほどの独自定義したrequestCodeの結果確認
+            case MY_PERMISSIONS_ACCESS_COARSE_LOCATION: {
+                if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    // ユーザーが許可したとき
+                    // 許可が必要な機能を改めて実行する
+
+                    // TODO もしも自分がコミュニティトークン作成者ならFacebookに投稿する
+                    getFacebookPermission();
+                } else {
+                    // ユーザーが許可しなかったとき
+                    // 許可されなかったため機能が実行できないことを表示する
+
+                    Toast.makeText(GDetailActivity.this, "Nearby Connections API利用のためにパーミッション許可が必要です", Toast.LENGTH_SHORT).show();
+                }
+                return;
+            }
+        }
+    }
+
+    void getFacebookPermission(){
+        //Facebookのパーミッションを持っているか確かめる
+        final Bundle permBundle = new Bundle();
+        permBundle.putCharSequence("permission", "publish_actions");
+        GraphRequest request = new GraphRequest(
+                AccessToken.getCurrentAccessToken(),
+                "/me/permissions", permBundle, HttpMethod.GET,
+                new GraphRequest.Callback() {
+                    @Override
+                    public void onCompleted(GraphResponse graphResponse) {
+                        Log.d(TAG, "btn_Create.setOnClickListener: response2: " + graphResponse.getJSONObject());
+                        try {
+                            JSONArray permList = (JSONArray) graphResponse.getJSONObject().get("data");
+                            if(permList.length() == 0){
+                                // パーミッションが無いので取得する
+                                askForFBPublishPerm(1);
+                            }else{
+                                JSONObject permData = (JSONObject) permList.get(0);
+                                String permVal = (String) permData.get("status");
+                                if(permVal.equals("granted")){
+                                    // パーミッションがあるので投稿する
+                                    postToFB();
+                                }else{
+                                    // パーミッションが足りないので取得する
+                                    askForFBPublishPerm(1);
+                                }
+                            }
+                        } catch (JSONException e) {
+                            Log.d(TAG, "btn_Create.setOnClickListener: exception while parsing fb check perm data" + e.toString());
+                            Toast.makeText(GDetailActivity.this, "Error occurred while connecting", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                }
+        ); //GraphRequest request = new GraphRequest(
+        request.executeAsync();
     }
 
     @Override
@@ -265,19 +333,25 @@ public class GDetailActivity extends AppCompatActivity {
                                     tv_saddress.setText(group_saddress);
                                 }
 
+                                Intent intent = new Intent(GDetailActivity.this, MANETManageService.class);
+                                stopService(intent);
+
                                 // →コミュニティトークンを作成するためのボタンを表示
                                 //btn_Create.setVisibility(View.VISIBLE);
                                 viewOfMaketoken(1);
                             }else {
                                 // コミュニティトークンが存在する
+                                // サービスは起動する
+                                requestAppPermissions(false);
                                 // そのコミュニティトークンを自らが作成したかを判別する
                                 if(TokenMADEby == 1 ){
-                                    // 自分が作った
+                                    // そのコミュニティトークンはワシが作った
                                     // コミュニティトークンを削除するボタンを表示
                                     btn_Delete.setVisibility(View.VISIBLE);
+
                                 } else {
                                     // 自分が作っていない場合、
-                                    // 特にコミュニティトークンに介入できる余地がないのでなにもしない
+                                    // 特にコミュニティトークンに介入できる余地がない
                                 }
                             }
                         } catch (JSONException e) {
@@ -372,11 +446,10 @@ public class GDetailActivity extends AppCompatActivity {
                         Log.d(TAG, "postToFB(): " + postid);
                         Toast.makeText(GDetailActivity.this, "コミュニティトークンを作成しました", Toast.LENGTH_LONG).show();
                         //btn_Create.setVisibility(View.GONE);
-                        startService(new Intent(getBaseContext(),MANETManageService.class));
                         viewOfMaketoken(0);
-
                         TokenMADEby = 1;
                         readFromFBgroup();
+                        startNearbyConnections();
                     }
                 }
         ).executeAsync();
@@ -440,6 +513,10 @@ public class GDetailActivity extends AppCompatActivity {
                 Log.d(TAG, "viewOfMaketoken: selectorに予期せぬ値が代入されました");
                 Toast.makeText(GDetailActivity.this, "Error occurred", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    void startNearbyConnections(){
+        startService(new Intent(getBaseContext(),MANETManageService.class));
     }
 
 }
