@@ -1,8 +1,27 @@
+buildscript {
+    repositories {
+        jcenter()
+    }
+
+    dependencies {
+        classpath "com.android.tools.build:gradle:2.3.3"
+    }
+}
+
 apply plugin: 'com.android.application'
 
 
 repositories {
     maven { url 'http://repo1.maven.org/maven2' }
+}
+
+allprojects {
+    repositories {
+        jcenter()
+        maven {
+            url "https://maven.google.com"
+        }
+    }
 }
 
 android {
@@ -39,5 +58,5 @@ dependencies {
     //Facebook SDK
     compile 'com.facebook.android:facebook-android-sdk:[4,5)'
     //Google Play Services SDK の中のnearbyに関するものだけを部分的にコンパイル
-    compile 'com.google.android.gms:play-services-nearby:11.4.0'
+    compile 'com.google.android.gms:play-services-nearby:11.4.2'
 }

@@ -167,6 +167,13 @@ public class GDetailActivity extends AppCompatActivity {
         } else {
             // インストール時点で許可されているのでチェックの必要なし
             Toast.makeText(GDetailActivity.this, "位置情報の取得は既に許可されています(Android 5.0以下です)", Toast.LENGTH_SHORT).show();
+            // 権限があるので次に進む
+            if(posting == true)
+            {
+                getFacebookPermission();
+            }else {
+                startNearbyConnections();
+            }/* if(posting == true) */
         }
     }
 
