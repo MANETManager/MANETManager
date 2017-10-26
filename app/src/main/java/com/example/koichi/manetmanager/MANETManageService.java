@@ -1,5 +1,4 @@
 package com.example.koichi.manetmanager;
-
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
@@ -204,7 +203,7 @@ public class MANETManageService extends Service implements
                     builder.setContentText("onPayloadTransferUpdate");
                     mNM.notify(1, builder.build());
                 }
-            };
+            }
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -283,6 +282,7 @@ public class MANETManageService extends Service implements
         /** このreturn値によってサービスが停止しても再起動が行われる
          * （終了前のintentが保持されていてonStartCommandに再度渡される） */
         return START_REDELIVER_INTENT;
+
     }
 
     // サービス停止時
@@ -873,6 +873,7 @@ public class MANETManageService extends Service implements
         }
         return name;
     }
+
 }
 
 

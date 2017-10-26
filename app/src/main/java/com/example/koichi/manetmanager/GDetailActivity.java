@@ -1,5 +1,6 @@
 package com.example.koichi.manetmanager;
 
+
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -13,7 +14,6 @@ import android.widget.Button;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
-
 
 import com.facebook.AccessToken;
 import com.facebook.CallbackManager;
@@ -42,8 +42,8 @@ import android.app.ActivityManager.RunningServiceInfo;
  */
 
 public class GDetailActivity extends AppCompatActivity {
-    private static final int MY_PERMISSIONS_ACCESS_COARSE_LOCATION = 1;
 
+    private static final int MY_PERMISSIONS_ACCESS_COARSE_LOCATION = 1;
     private TextView tv_groupname, tv_groupid, tv_tokenid, tv_mb, tv_mt, tv_saddress, noticeMakeToken, MTMaketoken, MBMaketoken;
     private Button btn_Create, btn_Delete;
     private Spinner spinner_MT, spinner_MB;
@@ -348,6 +348,7 @@ public class GDetailActivity extends AppCompatActivity {
                                 viewOfMaketoken(1);
                             }else {
                                 // コミュニティトークンが存在する
+
                                 // サービスは起動する
                                 requestAppPermissions(false);
                                 // そのコミュニティトークンを自らが作成したかを判別する
@@ -538,6 +539,5 @@ public class GDetailActivity extends AppCompatActivity {
     // MANETManageService(NearbyConnections)を起動する。
         startService(new Intent(getBaseContext(),MANETManageService.class));
     }
-
 
 }
