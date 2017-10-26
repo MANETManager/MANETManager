@@ -523,18 +523,20 @@ public class GDetailActivity extends AppCompatActivity {
     }
 
     void startNearbyConnections(){
-    /*Wakietakieへインテント飛ばす*/
+    /** Wakietakieへインテント飛ばそうと思って作っていたもの。要らなくなった。
 
-        Intent i = new Intent(Intent.ACTION_MAIN);
-        String ip = "0.0.0.0";
-        i.setAction("android.intent.category.LAUNCHER");
-        i.setClassName("com.google.location.nearby.apps.walkietalkie.automatic", "com.google.location.nearby.apps.walkietalkie.MainActivity");
-        i.putExtra("ip",ip);
-        i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        //i.setFlags(0x10200000);
-        startActivity(i);
+     **   Intent i = new Intent(Intent.ACTION_MAIN);
+     **   String ip = "0.0.0.0";
+     **   i.setAction("android.intent.category.LAUNCHER");
+     **   i.setClassName("com.google.location.nearby.apps.walkietalkie.automatic", "com.google.location.nearby.apps.walkietalkie.MainActivity");
+     **   i.putExtra("ip",ip);
+     **   i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+     **   //i.setFlags(0x10200000);
+     **   startActivity(i);
+     **/
 
-        //startService(new Intent(getBaseContext(),MANETManageService.class));
+    // MANETManageService(NearbyConnections)を起動する。
+        startService(new Intent(getBaseContext(),MANETManageService.class));
     }
 
 
