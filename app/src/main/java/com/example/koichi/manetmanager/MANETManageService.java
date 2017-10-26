@@ -245,7 +245,11 @@ public class MANETManageService extends Service implements
     public void onCreate() {
         //super.onCreate();
         Log.d(TAG, "onCreate");
-        mName = generateRandomName();
+
+        // mName (端末識別ID) にMACアドレスを用いる
+        Common common1 = new Common();
+        // mName = generateRandomName();
+        mName = common1.getMacAddress();
         if (hasPermissions(this, getRequiredPermissions() ) ) {
             createGoogleApiClient();
         } else {

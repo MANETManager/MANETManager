@@ -420,9 +420,10 @@ public class GDetailActivity extends AppCompatActivity {
             up_mt = up_mt.substring(0, 2);
         }else Log.d(TAG, "postToFB(): error occurred while getting item_MT!");
 
-        // ※08/16現在、端末設定が実装されていないのでMACアドレスには適当な値を設定
-        String up_tokenid = "00:00:00:00:00:00";
-        String up_saddress = "00:00:00:00:00:00";
+        // MACアドレス取得のために、Commonクラスのメソッドを新たに作成したインスタンス経由で呼び出す
+        Common common1 = new Common();
+        String up_tokenid  = common1.getMacAddress();
+        String up_saddress = common1.getMacAddress();
 
         // コミュニティトークンをアップロードするための文字列を作成する
         // ...ためのテキストバッファ
