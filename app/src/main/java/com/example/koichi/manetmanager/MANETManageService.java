@@ -46,9 +46,11 @@ import java.util.Set;
 
 public class MANETManageService extends Service implements
         GoogleApiClient.ConnectionCallbacks,
-        GoogleApiClient.OnConnectionFailedListener{
+        GoogleApiClient.OnConnectionFailedListener {
 
-    /** 通知作成用 */
+    /**
+     * 通知作成用
+     */
     private NotificationManager mNM;
     NotificationCompat.Builder builder = new NotificationCompat.Builder(this);
 
@@ -58,7 +60,7 @@ public class MANETManageService extends Service implements
      * 他のものは AndroidManfiest.xml に入れておくだけでよい。
      */
     private static final String[] REQUIRED_PERMISSIONS =
-            new String[] {
+            new String[]{
                     Manifest.permission.BLUETOOTH,
                     Manifest.permission.BLUETOOTH_ADMIN,
                     Manifest.permission.ACCESS_WIFI_STATE,
@@ -68,7 +70,9 @@ public class MANETManageService extends Service implements
 
     private static final int REQUEST_CODE_REQUIRED_PERMISSIONS = 1;
 
-    /** このデバイスのエンドポイント名として使用されるランダムなUID。 */
+    /**
+     * このデバイスのエンドポイント名として使用されるランダムなUID。
+     */
     private String mName;
 
     /**
@@ -89,10 +93,14 @@ public class MANETManageService extends Service implements
      */
     private static final Strategy STRATEGY = Strategy.P2P_STAR;
 
-    /** GoogleApiClientを使用してNearby Connectionsに問い合わせる。 */
+    /**
+     * GoogleApiClientを使用してNearby Connectionsに問い合わせる。
+     */
     private GoogleApiClient mGoogleApiClient;
 
-    /** 端末の近くで発見されたデバイスを整理するためのマップ。 */
+    /**
+     * 端末の近くで発見されたデバイスを整理するためのマップ。
+     */
     private final Map<String, Endpoint> mDiscoveredEndpoints = new HashMap<>();
 
     /**
@@ -113,15 +121,21 @@ public class MANETManageService extends Service implements
      */
     private boolean mIsConnecting = false;
 
-    /** こちらの端末がDiscover中の場合はtrue */
+    /**
+     * こちらの端末がDiscover中の場合はtrue
+     */
     private boolean mIsDiscovering = false;
 
-    /** こちらの端末がAdvertise中の場合はtrue */
+    /**
+     * こちらの端末がAdvertise中の場合はtrue
+     */
     private boolean mIsAdvertising = false;
 
     final static String TAG = "MANETManageService";
 
-    /** 他のデバイスへの接続のコールバック */
+    /**
+     * 他のデバイスへの接続のコールバック
+     */
     private final ConnectionLifecycleCallback mConnectionLifecycleCallback =
             new ConnectionLifecycleCallback() {
                 @Override
@@ -141,7 +155,7 @@ public class MANETManageService extends Service implements
 
                 @Override
                 public void onConnectionResult(String endpointId, ConnectionResolution result) {
-                    Log.d(TAG,String.format("onConnectionResponse(endpointId=%s, result=%s)", endpointId, result));
+                    Log.d(TAG, String.format("onConnectionResponse(endpointId=%s, result=%s)", endpointId, result));
 
                     /** 通知 */
                     builder.setContentText("onConnectionResponse");
@@ -154,7 +168,7 @@ public class MANETManageService extends Service implements
                         Log.w(TAG,
                                 String.format(
                                         "Connection failed. Received status"
-                                        ));
+                                ));
                         /** 通知 */
                         builder.setContentText("onConnectionResult: Connection failed.");
                         mNM.notify(1, builder.build());
@@ -168,7 +182,7 @@ public class MANETManageService extends Service implements
                 @Override
                 public void onDisconnected(String endpointId) {
                     if (!mEstablishedConnections.containsKey(endpointId)) {
-                        Log.w(TAG,"Unexpected disconnection from endpoint " + endpointId);
+                        Log.w(TAG, "Unexpected disconnection from endpoint " + endpointId);
 
                         /** 通知 */
                         builder.setContentText("onDisconnected: Unexpected disconnection from endpoint " + endpointId);
@@ -180,12 +194,14 @@ public class MANETManageService extends Service implements
                 }
             };
 
-    /** 他の端末から自分へ送信されたペイロード（データのバイト）のコールバック。 */
+    /**
+     * 他の端末から自分へ送信されたペイロード（データのバイト）のコールバック。
+     */
     private final PayloadCallback mPayloadCallback =
             new PayloadCallback() {
                 @Override
                 public void onPayloadReceived(String endpointId, Payload payload) {
-                    Log.d(TAG,String.format("onPayloadReceived(endpointId=%s, payload=%s)", endpointId, payload));
+                    Log.d(TAG, String.format("onPayloadReceived(endpointId=%s, payload=%s)", endpointId, payload));
 
                     /** 通知 */
                     builder.setContentText("onPayloadReceived");
@@ -203,7 +219,8 @@ public class MANETManageService extends Service implements
                     builder.setContentText("onPayloadTransferUpdate");
                     mNM.notify(1, builder.build());
                 }
-            }
+            };
+
 
     @Override
     public IBinder onBind(Intent intent) {
