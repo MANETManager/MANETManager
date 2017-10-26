@@ -28,23 +28,28 @@
         android:layout_height="0dp"
         android:text="MToD:"
         android:textSize="40sp"
-        android:layout_marginEnd="12dp"
-        tools:layout_editor_absoluteY="134dp"
-        tools:layout_editor_absoluteX="26dp" />
+        tools:layout_constraintTop_creator="1"
+        tools:layout_constraintBottom_creator="1"
+        android:layout_marginStart="22dp"
+        app:layout_constraintBottom_toBottomOf="@+id/mtod"
+        tools:layout_constraintLeft_creator="1"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/change_mtod"
+        android:layout_marginLeft="22dp" />
 
     <Button
-        android:id="@+id/info"
+        android:id="@+id/button_macAddress"
         android:layout_width="220dp"
         android:layout_height="48dp"
-        android:text="端末情報"
+        android:layout_marginBottom="33dp"
+        android:text="MACアドレス入力"
         android:textSize="20sp"
-        tools:layout_constraintRight_creator="1"
-        tools:layout_constraintBottom_creator="1"
         app:layout_constraintBottom_toTopOf="@+id/logout"
+        app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent"
+        tools:layout_constraintBottom_creator="1"
         tools:layout_constraintLeft_creator="1"
-        android:layout_marginBottom="43dp"
-        app:layout_constraintLeft_toLeftOf="parent" />
+        tools:layout_constraintRight_creator="1" />
 
     <Button
         android:id="@+id/logout"
@@ -55,10 +60,11 @@
         tools:layout_constraintRight_creator="1"
         tools:layout_constraintBottom_creator="1"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintRight_toRightOf="@+id/info"
+        app:layout_constraintRight_toRightOf="@+id/button_macAddress"
         tools:layout_constraintLeft_creator="1"
-        android:layout_marginBottom="103dp"
-        app:layout_constraintLeft_toLeftOf="@+id/info" />
+        android:layout_marginBottom="79dp"
+        app:layout_constraintLeft_toLeftOf="@+id/button_macAddress"
+        app:layout_constraintHorizontal_bias="0.0" />
 
     <Button
         android:id="@+id/change_mtod"
@@ -116,4 +122,16 @@
         tools:layout_constraintLeft_creator="1"
         tools:layout_constraintRight_creator="1"
         tools:layout_constraintTop_creator="1" />
+
+    <TextView
+        android:id="@+id/text_macAddress"
+        android:layout_width="104dp"
+        android:layout_height="44dp"
+        android:textSize="30sp"
+        android:layout_marginBottom="24dp"
+        app:layout_constraintBottom_toTopOf="@+id/button_macAddress"
+        tools:layout_constraintRight_creator="1"
+        app:layout_constraintRight_toRightOf="parent"
+        tools:layout_constraintLeft_creator="1"
+        app:layout_constraintLeft_toLeftOf="parent" />
 </android.support.constraint.ConstraintLayout>

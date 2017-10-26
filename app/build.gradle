@@ -1,13 +1,14 @@
+//↓↓ Error:(1, 0) Plugin with id 'com.android.application' not found.の対処法
 buildscript {
     repositories {
         jcenter()
         mavenCentral()
     }
-
     dependencies {
         classpath 'com.android.tools.build:gradle:2.3.3'
     }
 }
+//↑↑ Error:(1, 0) Plugin with id 'com.android.application' not found.の対処法
 
 apply plugin: 'com.android.application'
 

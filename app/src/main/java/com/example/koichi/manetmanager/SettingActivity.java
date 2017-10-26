@@ -15,6 +15,8 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 
+import static java.lang.Double.parseDouble;
+
 
 public class SettingActivity extends AppCompatActivity {
 
@@ -23,13 +25,19 @@ public class SettingActivity extends AppCompatActivity {
 
     private TextView mbod;
     private TextView mtod;
+    private TextView macAddress;
 
     private EditText value_mbod;
     private EditText value_mtod;
+    private EditText value_macAddress;
 
     private Button change_mbod;
     private Button change_mtod;
     private Button logout_Button;
+    private Button macAddress_Button;
+
+    //added
+    private Common common;
 
     public void setValueMbod(EditText e){
         value_mbod = e;
@@ -45,6 +53,12 @@ public class SettingActivity extends AppCompatActivity {
         return value_mtod;
     }
 
+    public void setValueMacAddress(EditText e){
+        value_macAddress = e;
+    }
+    public EditText getValueMacAddress(){
+        return value_macAddress;
+    }
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -52,13 +66,19 @@ public class SettingActivity extends AppCompatActivity {
 
         change_mbod = (Button) findViewById(R.id.change_mbod);
         change_mtod = (Button) findViewById(R.id.change_mtod);
+        macAddress_Button = (Button) findViewById(R.id.button_macAddress);
         mbod = (TextView) findViewById(R.id.mbod);
         mtod = (TextView) findViewById(R.id.mtod);
+        macAddress = (TextView) findViewById(R.id.text_macAddress);
+
+        //added
+        common = (Common) this.getApplication();
 
         //idを参照できない
         //value_mbod = (EditText) findViewById(R.id.value_mbod);
         //value_mtod = (EditText) findViewById(R.id.value_mtod);
 
+        //MBoD入力
         change_mbod.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -85,8 +105,12 @@ public class SettingActivity extends AppCompatActivity {
                         */
 
                         //private宣言されたvalue_mtodを使う場合
-                        setValueMbod((EditText) mbodView.findViewById(R.id.value_mbod));
-                        mbod.setText(getValueMbod().getText().toString());
+                        setValueMbod((EditText) mbodView.findViewById(R.id.value_mbod)); //カスタムダイアログで入力された数値をvalue_mbodに代入
+                        //stringとdoubleにそれぞれ代入
+                        String string_mbod = getValueMbod().getText().toString();
+                        double double_mbod = parseDouble(string_mbod);
+                        mbod.setText(string_mbod);
+                        common.setMbod(double_mbod); //グローバル関数に代入
                     }
                 });
 
@@ -101,6 +125,7 @@ public class SettingActivity extends AppCompatActivity {
             }
         });
 
+        //MTOD入力
         change_mtod.setOnClickListener(new View.OnClickListener(){
             @Override
             public void onClick(View v){
@@ -128,7 +153,58 @@ public class SettingActivity extends AppCompatActivity {
 
                         //private宣言されたvalue_mtodを使う場合
                         setValueMtod((EditText) mtodView.findViewById(R.id.value_mtod));
-                        mtod.setText(getValueMtod().getText().toString());
+                        String string_mtod = getValueMtod().getText().toString();
+                        //stringとdoubleにそれぞれ代入
+                        double double_mtod = parseDouble(string_mtod);
+                        mtod.setText(string_mtod);
+                        common.setMtod(double_mtod); //グローバル関数に代入
+                    }
+                });
+
+                // キャンセルボタンの設定
+                dialog.setNegativeButton("キャンセル", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int whichButton) {
+                        // キャンセルボタンをタップした時の処理をここに記述
+                    }
+                });
+
+                dialog.show();
+            }
+        });
+
+        //MACアドレス入力
+        macAddress_Button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                //inflaterを取得できず
+                //LayoutInflater inflater = (LayoutInflater)this.getSystemService(LAYOUT_INFLATER_SERVICE);
+
+                LayoutInflater inflater = SettingActivity.this.getLayoutInflater();
+
+                final View macAddressView = inflater.inflate(R.layout.custom_dialog_macaddress,(ViewGroup)findViewById(R.id.macAddressdialog_layout));
+
+                AlertDialog.Builder dialog = new AlertDialog.Builder(SettingActivity.this);
+
+                dialog.setTitle("MACアドレスを入力してください");
+                dialog.setView(macAddressView);
+
+
+                // OKボタンの設定
+                dialog.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int whichButton) {
+                        // OKボタンをタップした時の処理をここに記述
+                        // 正しい方
+                        //EditText value_mtod = (EditText) mtodView.findViewById(R.id.value_mtod);
+                        //mtod.setText(value_mtod.getText().toString());
+
+
+                        //private宣言されたvalue_mtodを使う場合
+                        setValueMacAddress((EditText) macAddressView.findViewById(R.id.value_macAddress)); //カスタムダイアログで入力された数値をvalue_mbodに代入
+                        //stringとdoubleにそれぞれ代入
+                        String string_macAddress = getValueMacAddress().getText().toString();
+                        //double double_macAddress = parseDouble(string_mbod);
+                        macAddress.setText(string_macAddress);
+                        common.setMacAddress(string_macAddress); //グローバル関数に代入
                     }
                 });
 
