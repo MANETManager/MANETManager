@@ -2,9 +2,11 @@ package com.example.koichi.manetmanager;
 
 import android.app.Dialog;
 import android.app.DialogFragment;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.app.FragmentManager;
+import android.content.SharedPreferences;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -15,6 +17,9 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 
+import com.google.gson.Gson;
+
+import static java.lang.Double.compare;
 import static java.lang.Double.parseDouble;
 
 
@@ -24,15 +29,12 @@ public class SettingActivity extends AppCompatActivity {
     private FragmentManager fragmentManager;
 
     private TextView mbod;
-    private TextView mtod;
     private TextView macAddress;
 
     private EditText value_mbod;
-    private EditText value_mtod;
     private EditText value_macAddress;
 
     private Button change_mbod;
-    private Button change_mtod;
     private Button logout_Button;
     private Button macAddress_Button;
 
@@ -44,13 +46,6 @@ public class SettingActivity extends AppCompatActivity {
     }
     public EditText getValueMbod(){
         return value_mbod;
-    }
-
-    public void setValueMtod(EditText e){
-        value_mtod = e;
-    }
-    public EditText getValueMtod(){
-        return value_mtod;
     }
 
     public void setValueMacAddress(EditText e){
@@ -65,18 +60,15 @@ public class SettingActivity extends AppCompatActivity {
         setContentView(R.layout.activity_setting);
 
         change_mbod = (Button) findViewById(R.id.change_mbod);
-        change_mtod = (Button) findViewById(R.id.change_mtod);
         macAddress_Button = (Button) findViewById(R.id.button_macAddress);
         mbod = (TextView) findViewById(R.id.mbod);
-        mtod = (TextView) findViewById(R.id.mtod);
         macAddress = (TextView) findViewById(R.id.text_macAddress);
 
-        //added
+        //グローバル変数の取得
         common = (Common) this.getApplication();
 
         //idを参照できない
         //value_mbod = (EditText) findViewById(R.id.value_mbod);
-        //value_mtod = (EditText) findViewById(R.id.value_mtod);
 
         //MBoD入力
         change_mbod.setOnClickListener(new View.OnClickListener() {
@@ -125,52 +117,7 @@ public class SettingActivity extends AppCompatActivity {
             }
         });
 
-        //MTOD入力
-        change_mtod.setOnClickListener(new View.OnClickListener(){
-            @Override
-            public void onClick(View v){
-                //inflaterを取得できず
-                //LayoutInflater inflater = (LayoutInflater)this.getSystemService(LAYOUT_INFLATER_SERVICE);
 
-                LayoutInflater inflater = SettingActivity.this.getLayoutInflater();
-
-                final View mtodView = inflater.inflate(R.layout.custom_dialog_mtod,(ViewGroup)findViewById(R.id.mtoddialog_layout));
-
-                AlertDialog.Builder dialog = new AlertDialog.Builder(SettingActivity.this);
-
-                dialog.setTitle("MToDを入力してください");
-                dialog.setView(mtodView);
-
-
-                // OKボタンの設定
-                dialog.setPositiveButton("OK", new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int whichButton) {
-                        // OKボタンをタップした時の処理をここに記述
-                        /* 正しい方
-                        EditText value_mtod = (EditText) mtodView.findViewById(R.id.value_mtod);
-                        mtod.setText(value_mtod.getText().toString());
-                        */
-
-                        //private宣言されたvalue_mtodを使う場合
-                        setValueMtod((EditText) mtodView.findViewById(R.id.value_mtod));
-                        String string_mtod = getValueMtod().getText().toString();
-                        //stringとdoubleにそれぞれ代入
-                        double double_mtod = parseDouble(string_mtod);
-                        mtod.setText(string_mtod);
-                        common.setMtod(double_mtod); //グローバル関数に代入
-                    }
-                });
-
-                // キャンセルボタンの設定
-                dialog.setNegativeButton("キャンセル", new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int whichButton) {
-                        // キャンセルボタンをタップした時の処理をここに記述
-                    }
-                });
-
-                dialog.show();
-            }
-        });
 
         //MACアドレス入力
         macAddress_Button.setOnClickListener(new View.OnClickListener() {
@@ -227,18 +174,30 @@ public class SettingActivity extends AppCompatActivity {
         logout_Button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                //端末内に情報を保存
+                //下2行がもうちょいすっきりできる気がするww
+                common.getAccountGroup().get(common.getListIndex()).setMbod(common.getMbod());
+                common.getAccountGroup().get(common.getListIndex()).setMacAddress(common.getMacAddress());
+                Gson gson = new Gson();
+                SharedPreferences sharedPreferences = getSharedPreferences("accounts", Context.MODE_PRIVATE);
+                SharedPreferences.Editor editor = sharedPreferences.edit();
+                editor.putString("accountJson", gson.toJson(common.getAccountGroup()));
+                editor.apply();
+                //画面遷移
                 Intent intent = new Intent(getApplication(), MainActivity.class);
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
                 startActivity(intent);
 
             }
         });
     }
-
+/*
    public void setTextView(String message, int flag) {
         if(flag == 1)mbod.setText(message);
        else if(flag == 2)mtod.setText(message);
     }
-
+*/
 /*
     // DialogFragment を継承したクラス
     public static class AlertDialogFragment extends DialogFragment {
