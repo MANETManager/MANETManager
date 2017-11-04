@@ -70,52 +70,60 @@ public class MainActivity extends AppCompatActivity {
         //commonクラスで宣言したグローバル関数の取得
         common = (Common)this.getApplication();
 
-        //ユーザー名とパスワードの取得
-        value_username = (EditText)findViewById(R.id.value_username);
-        value_password = (EditText)findViewById(R.id.value_password);
-
-        setString_username(value_username.getText().toString());
-        setString_password(value_password.getText().toString());
 
         //ユーザー名とパスワード認証
         Button authentication_Button = (Button) findViewById(R.id.authentication);
         authentication_Button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                ArrayList<Accounts> accountList = new ArrayList<Accounts>();
+                //ユーザー名とパスワードの取得
+                value_username = (EditText)findViewById(R.id.value_username);
+                value_password = (EditText)findViewById(R.id.value_password);
+
+                setString_username(value_username.getText().toString());
+                setString_password(value_password.getText().toString());
+
+                ArrayList<Accounts> accountList;
+                //端末内にJSON型保存されているArrayList<Accounts>型のアカウント情報を取得
                 Gson gson = new Gson();
-                SharedPreferences accounts = getSharedPreferences("accounts", Context.MODE_PRIVATE);
-                //登録されていなかったら、オブジェクトを登録する
-                if(accounts == null) {
+                SharedPreferences sharedPreferences = getSharedPreferences("accounts", Context.MODE_PRIVATE);
+                accountList = gson.fromJson(sharedPreferences.getString("accountJson", null), new TypeToken<ArrayList<Accounts>>(){}.getType());
+
+                //端末内にアカウント情報がなかったら、入力されたアカウント情報をグローバル関数に渡す
+                if(accountList == null) {
                     Accounts account = new Accounts(getString_username(), getString_password());
+                    accountList = new ArrayList<Accounts>();
                     accountList.add(account);
-                    SharedPreferences.Editor editor = accounts.edit();
-                    editor.putString("accountJson", gson.toJson(accountList));
-                    editor.apply();
+                    common.setAccountGroup(accountList);
+                    common.setListIndex(0);
+                    common.setUsername(getString_username());
+                    common.setPassword(getString_password());
+                    Intent intent = new Intent(getApplication(), MenuActivity.class);
+                    startActivity(intent);
                 }
-                //端末内にアカウントが存在する
+                //端末内にアカウント情報が存在するとき
                 else{
-                    accountList = gson.fromJson(accounts.getString("accountJson", null), new TypeToken<List>(){}.getType());
-                    //アカウントがすでに端末の中に登録されているかの確認
-                    for (int i = 0 ; i < accountList.size() ; i++){
+                    //入力情報と一致するアカウントが端末内に保存されているかの確認
+                    int i;
+                    for (i = 0 ; i < accountList.size() ; i++){
                         Accounts currentAcount = accountList.get(i);
                         if (currentAcount.getUsername().equals(getString_username())){
                             if(currentAcount.getPassword().equals(getString_password())){
                                 //ログインユーザーの変数をグローバル関数に渡す
-                                common.setListIndex(i);
-                                common.setUsername(currentAcount.getUsername());
-                                common.setPassword(currentAcount.getPassword());
                                 common.setMbod(currentAcount.getMbod());
                                 common.setMacAddress(currentAcount.getMacAddress());
-                                Intent intent = new Intent(getApplication(), MenuActivity.class);
-                                startActivity(intent);
-                                //インテントが移ったら、それ以降のコードは読まれるのか？それによってbreakの有無が変わる
-                                //break;
+                                break;
                             }
                         }
                     }
-                    Accounts account = new Accounts(getString_username(), getString_password());
-                    accountList.add(account);
+                    if(i == accountList.size()){//入力情報と一致するアカウントがなかった場合は、新たにアカウントを作成
+                        Accounts account = new Accounts(getString_username(), getString_password());
+                        accountList.add(account);
+                    }
+                    common.setAccountGroup(accountList);
+                    common.setListIndex(i);
+                    common.setUsername(getString_username());
+                    common.setPassword(getString_password());
                     Intent intent = new Intent(getApplication(), MenuActivity.class);
                     startActivity(intent);
                 }
@@ -168,30 +176,3 @@ public class MainActivity extends AppCompatActivity {
     }
 
 }
-/*
-//アカウント管理用のクラス
-class Account{
-    private String username;
-    private String password;
-    private double mbod;
-    private String macAddress;
-
-    public Account(String username, String password){
-        this.username = username;
-        this.password = password;
-    }
-
-    public void setUsername(String s){ username = s; }
-    public String getUsername(){ return username; }
-
-    public  void setPassword(String s){ password = s; }
-    public String getPassword(){ return password; }
-
-    public void setMbod(double s){ mbod = s; }
-    public double getMbod(){ return mbod; }
-
-    public void setMacAddress(String s){ macAddress = s; }
-    public String getMacAddress(){ return macAddress; }
-
-}
-*/

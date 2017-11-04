@@ -58,7 +58,7 @@
             android:enabled="true"
             android:exported="false" />
 
-        <activity android:name=".AccountSettingActivity"></activity>
+        <activity android:name=".AccountSettingActivity"/>
     </application>
 
 </manifest>

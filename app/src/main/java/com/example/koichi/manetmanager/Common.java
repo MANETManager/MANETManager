@@ -15,7 +15,7 @@ public class Common extends Application {
     private double mbod;
     private String macAddress;
     private int listIndex; //ログインしているユーザーがaccountGroupのどこに格納されているかを示す
-    private ArrayList<Accounts> accountGroup = new ArrayList<Accounts>();
+    private ArrayList<Accounts> accountGroup;
 
     public void setUsername(String string){ username = string; }
     public String getUsername(){ return username; }
@@ -34,5 +34,13 @@ public class Common extends Application {
 
     public void setAccountGroup(ArrayList<Accounts> list){ accountGroup = list; }
     public ArrayList<Accounts> getAccountGroup(){ return accountGroup; }
+
+    void init(){
+        username = null;
+        password = null;
+        mbod = 0;
+        macAddress = null;
+        listIndex = 0;
+    }
 
 }
