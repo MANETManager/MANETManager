@@ -211,6 +211,7 @@ public class MANETManageService extends Service implements
         return null;
     }
 
+    // GoogleApiClientを使用してNearby Connectionsに問い合わせる
     private void createGoogleApiClient() {
         Log.d(TAG, "createGoogleApiClient");
 
@@ -298,6 +299,7 @@ public class MANETManageService extends Service implements
     /**
      * Nearby Connectionsに接続した。{@link #startDiscovering()} と　{@link #startAdvertising()} を
      * 呼び出すことができる。
+     * ※おそらくmGoogleApiClient.connect()が成功した後に反応する
      */
     @Override
     public void onConnected(@Nullable Bundle bundle) {
@@ -427,7 +429,7 @@ public class MANETManageService extends Service implements
         }
     }
 
-    /** @return 現在接続されているエンドポイントのリストを返す。 */
+    /** @return 現在発見されているエンドポイントのリストを返す。 */
     protected Set<Endpoint> getDiscoveredEndpoints() {
         Set<Endpoint> endpoints = new HashSet<>();
         endpoints.addAll(mDiscoveredEndpoints.values());
