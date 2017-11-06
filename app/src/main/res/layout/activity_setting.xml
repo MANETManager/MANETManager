@@ -22,21 +22,6 @@
         tools:layout_constraintLeft_creator="1"
         tools:layout_constraintTop_creator="1" />
 
-    <TextView
-        android:id="@+id/text_mtod"
-        android:layout_width="wrap_content"
-        android:layout_height="0dp"
-        android:text="MToD:"
-        android:textSize="40sp"
-        tools:layout_constraintTop_creator="1"
-        tools:layout_constraintBottom_creator="1"
-        android:layout_marginStart="22dp"
-        app:layout_constraintBottom_toBottomOf="@+id/mtod"
-        tools:layout_constraintLeft_creator="1"
-        app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintTop_toTopOf="@+id/change_mtod"
-        android:layout_marginLeft="22dp" />
-
     <Button
         android:id="@+id/button_macAddress"
         android:layout_width="220dp"
@@ -65,20 +50,6 @@
         android:layout_marginBottom="79dp"
         app:layout_constraintLeft_toLeftOf="@+id/button_macAddress"
         app:layout_constraintHorizontal_bias="0.0" />
-
-    <Button
-        android:id="@+id/change_mtod"
-        android:layout_width="88dp"
-        android:layout_height="50dp"
-        android:text="変更"
-        android:textSize="20sp"
-        tools:layout_constraintTop_creator="1"
-        tools:layout_constraintRight_creator="1"
-        app:layout_constraintRight_toRightOf="@+id/change_mbod"
-        android:layout_marginTop="54dp"
-        app:layout_constraintTop_toBottomOf="@+id/change_mbod"
-        tools:layout_constraintLeft_creator="1"
-        app:layout_constraintLeft_toLeftOf="@+id/change_mbod" />
 
     <Button
         android:id="@+id/change_mbod"
@@ -111,27 +82,16 @@
         tools:layout_constraintRight_creator="1" />
 
     <TextView
-        android:id="@+id/mtod"
-        android:layout_width="0dp"
-        android:layout_height="50dp"
-        android:layout_marginTop="54dp"
-        android:textSize="40sp"
-        app:layout_constraintLeft_toLeftOf="@+id/mbod"
-        app:layout_constraintRight_toRightOf="@+id/mbod"
-        app:layout_constraintTop_toBottomOf="@+id/mbod"
-        tools:layout_constraintLeft_creator="1"
-        tools:layout_constraintRight_creator="1"
-        tools:layout_constraintTop_creator="1" />
-
-    <TextView
         android:id="@+id/text_macAddress"
-        android:layout_width="104dp"
-        android:layout_height="44dp"
-        android:textSize="30sp"
+        android:layout_width="219dp"
+        android:layout_height="40dp"
         android:layout_marginBottom="24dp"
+        android:gravity="center"
+        android:textSize="30sp"
         app:layout_constraintBottom_toTopOf="@+id/button_macAddress"
-        tools:layout_constraintRight_creator="1"
+        app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent"
         tools:layout_constraintLeft_creator="1"
-        app:layout_constraintLeft_toLeftOf="parent" />
+        tools:layout_constraintRight_creator="1"
+        tools:layout_editor_absoluteY="237dp" />
 </android.support.constraint.ConstraintLayout>
