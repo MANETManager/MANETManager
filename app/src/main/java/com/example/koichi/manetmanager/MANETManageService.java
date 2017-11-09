@@ -89,6 +89,16 @@ public class MANETManageService extends Service implements
     private State mState = State.UNKNOWN;
 
     /**
+     * Discoverモードに関する状態。状態の詳細は dis_State を参照。
+     */
+    private dis_State mDisState = dis_State.STOP;
+
+    /**
+     * Advertiseモードに関する状態。状態の詳細は adv_State を参照。
+     */
+    private adv_State mAdvState = adv_State.STOP;
+
+    /**
      * Nearby Connectionsで利用する connection strategy。 今回は、 Bluetooth Classicと
      * WiFi ホットスポットの組み合わせであるP2P_STARを採用した。
      */
@@ -791,6 +801,178 @@ public class MANETManageService extends Service implements
                 stopDiscovering();
                 stopAdvertising();
                 break;
+            default:
+                // no-op
+                break;
+        }
+    }
+
+    /**
+     * Discoverに関する状態が変化したとき。
+     * @param state 次に変化させるdis_State。
+     */
+    private void setDisState(dis_State state){
+        Log.d(TAG, "setDisState");
+
+        /** 通知 */
+        builder.setContentText("setDisState");
+        mNM.notify(1, builder.build());
+
+        Log.d(TAG,"State set to " + state);
+        dis_State oldState = mDisState;
+        mDisState = state;
+        onDisStateChanged(oldState, state);
+    }
+
+    /** @return 現在のmDisStateを返す。 */
+    private dis_State getDisState() {
+        return mDisState;
+    }
+
+    /**
+     * dis_Stateが変化した時。
+     *
+     * @param oldState 前の状態。この状態に関連するものはすべて掃除する。
+     * @param newState 新しい状態。この状態のUIを準備する。
+     */
+    private void onDisStateChanged(dis_State oldState, dis_State newState) {
+        Log.d(TAG, "onDisStateChanged");
+
+        /** 通知 */
+        builder.setContentText("onDisStateChanged");
+        mNM.notify(1, builder.build());
+
+        // Nearby Connectionsを新しい状態に更新する。
+        switch (newState) {
+            case STOP:
+                /*
+                Log.d(TAG,"dis_State: STOP");
+
+                //通知
+                builder.setContentText("dis_State: STOP");
+                mNM.notify(2, builder.build());
+
+                disconnectFromAllEndpoints();
+                startDiscovering();
+                startAdvertising();
+                break;
+                */
+            case NORMAL:
+                /*
+                Log.d(TAG,"dis_state: NORMAL");
+
+                // 通知
+                builder.setContentText("dis_state: NORMAL");
+                mNM.notify(2, builder.build());
+
+                stopDiscovering();
+                stopAdvertising();
+                break;
+                */
+            default:
+                // no-op
+                break;
+        }
+    }
+
+    /**
+     * Advertiseに関する状態が変化したとき。
+     * @param state 次に変化させるadv_State。
+     */
+    private void setAdvState(adv_State state){
+        Log.d(TAG, "setAdvState");
+
+        /** 通知 */
+        builder.setContentText("setAdvState");
+        mNM.notify(1, builder.build());
+
+        Log.d(TAG,"State set to " + state);
+        adv_State oldState = mAdvState;
+        mAdvState = state;
+        onAdvStateChanged(oldState, state);
+    }
+
+    /** @return 現在のmDisStateを返す。 */
+    private adv_State getAdvState() {
+        return mAdvState;
+    }
+
+    /**
+     * dis_Stateが変化した時。
+     *
+     * @param oldState 前の状態。この状態に関連するものはすべて掃除する。
+     * @param newState 新しい状態。この状態のUIを準備する。
+     */
+    private void onAdvStateChanged(adv_State oldState, adv_State newState) {
+        Log.d(TAG, "onAdvStateChanged");
+
+        /** 通知 */
+        builder.setContentText("onAdvStateChanged");
+        mNM.notify(1, builder.build());
+
+        // Nearby Connectionsを新しい状態に更新する。
+        switch (newState) {
+            case STOP:
+                /*
+                Log.d(TAG,"dis_State: STOP");
+
+                //通知
+                builder.setContentText("dis_State: STOP");
+                mNM.notify(2, builder.build());
+
+                disconnectFromAllEndpoints();
+                startDiscovering();
+                startAdvertising();
+                break;
+                */
+            case REQUEST:
+                /*
+                Log.d(TAG,"dis_state: NORMAL");
+
+                // 通知
+                builder.setContentText("dis_state: NORMAL");
+                mNM.notify(2, builder.build());
+
+                stopDiscovering();
+                stopAdvertising();
+                break;
+                */
+            case REPLY:
+                /*
+                Log.d(TAG,"dis_state: NORMAL");
+
+                // 通知
+                builder.setContentText("dis_state: NORMAL");
+                mNM.notify(2, builder.build());
+
+                stopDiscovering();
+                stopAdvertising();
+                break;
+                */
+            case BROKEN:
+                /*
+                Log.d(TAG,"dis_state: NORMAL");
+
+                // 通知
+                builder.setContentText("dis_state: NORMAL");
+                mNM.notify(2, builder.build());
+
+                stopDiscovering();
+                stopAdvertising();
+                break;
+                */
+            case CONSTRUCTED:
+                /*
+                Log.d(TAG,"dis_state: NORMAL");
+
+                // 通知
+                builder.setContentText("dis_state: NORMAL");
+                mNM.notify(2, builder.build());
+
+                stopDiscovering();
+                stopAdvertising();
+                break;
+                */
             default:
                 // no-op
                 break;
