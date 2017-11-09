@@ -39,6 +39,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
@@ -114,6 +115,12 @@ public class MANETManageService extends Service implements
      * Discovererにとって、この中身は常に１つしか存在しない。
      */
     private final Map<String, Endpoint> mEstablishedConnections = new HashMap<>();
+
+    /**
+     * String型（今のところ終点ノードアドレスを想定）と関係するRouteList（経路表クラス）のマップ。
+     * 端末が知っている宛先の数だけ、このMapの要素数とRouteListが存在する。はず。
+     */
+    private final Map<String, RouteList> mRouteLists = new HashMap<>();
 
     /**
      * こちらの端末が、発見された端末にこちらへ接続するよう要求している場合はtrueです。
@@ -848,6 +855,30 @@ public class MANETManageService extends Service implements
         CONNECTED
     }
 
+    /** Discoverモードに関して、端末が変化し得る状態の一覧。
+     *  STOP:   停止状態（コミュニティトークン作成待ち）
+     *  NORMAL: 通常状態（各種メッセージ・実データ受信）
+     */
+    public enum dis_State{
+        STOP,
+        NORMAL
+    }
+
+    /** Advertiserモードに関して、端末が変化し得る状態の一覧。
+     * STOP:        停止状態（送信メッセージ作成待ち）
+     * REQUEST:     経路探索-要求状態（RREQ送信）
+     * REPLY:       経路探索-返信状態（RREP送信）
+     * BROKEN:      経路破棄状態（RERR送信）
+     * CONSTRUCTED: 経路構築状態（実データ送信）
+     */
+    public enum adv_State{
+        STOP,
+        REQUEST,
+        REPLY,
+        BROKEN,
+        CONSTRUCTED
+    }
+
     /** 通話できる（データの送受信ができる）デバイスを表します。 */
     protected static class Endpoint {
         @NonNull private final String id;
@@ -886,6 +917,64 @@ public class MANETManageService extends Service implements
         public String toString() {
             return String.format("Endpoint{id=%s, name=%s}", id, name);
         }
+    }
+
+    /**
+     * 経路表クラス
+     * 経路表用Mapによって終点ノードアドレス（もしくはendpointId）と連携して
+     * 端末自身が持つ経路表を表す
+     */
+    protected static class RouteList{
+        @NonNull private String endNodeAddress; /* 終点ノードアドレス */
+        @NonNull private String endSequenceNum; /* 終点シーケンス番号 */
+        @NonNull private String nextHopAddress; /* 次ホップアドレス */
+        private int effectiveDate;              /* 有効期限 */
+        List<String> precursorList = new ArrayList<String>(); /* 終点ノードアドレスについてのprecursorリスト */
+
+        private RouteList(@NonNull String regist_Address, @NonNull String regist_SeqNum, @NonNull String regist_HopAddress, int regist_Date) {
+            this.endNodeAddress = regist_Address;
+            this.endSequenceNum = regist_SeqNum;
+            this.nextHopAddress = regist_HopAddress;
+            this.effectiveDate = regist_Date;
+        }
+
+        @NonNull
+        public String getEndNodeAdd() {
+            return endNodeAddress;
+        }
+
+        @NonNull
+        public String getSeqNum() {
+            return endSequenceNum;
+        }
+
+        @NonNull
+        public String getHopAdd() {
+            return nextHopAddress;
+        }
+
+        @NonNull
+        public int getDate() {
+            return effectiveDate;
+        }
+
+        /** precursorリストにノードアドレスを追加する **/
+        public void addPrecursor(@NonNull String NodeAddress){
+            precursorList.add(NodeAddress);
+        }
+
+        /**
+         * RERR時など、precursorリストの中身が空か否かを返すクラス
+         * 空ならtrue、空ではないならfalse
+         **/
+        public boolean isEmptyPrecursor(){
+            if(precursorList.isEmpty() == true){
+                return true;
+            } else {
+                return false;
+            }
+        }
+
     }
 
     private static String generateRandomName() {
