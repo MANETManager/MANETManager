@@ -44,6 +44,8 @@ import android.app.ActivityManager.RunningServiceInfo;
  * Created by Takami_res on 2017/08/15.
  */
 
+//TODO: GraphAPIを通してCトークンを取得したらそれをCommonクラスへグローバル変数として保存する動作の実装
+
 public class GDetailActivity extends AppCompatActivity {
 
     private static final int MY_PERMISSIONS_ACCESS_COARSE_LOCATION = 1;

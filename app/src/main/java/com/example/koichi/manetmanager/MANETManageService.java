@@ -269,6 +269,8 @@ public class MANETManageService extends Service implements
     }
 
     // サービス作成時
+    //TODO: グローバル変数の値から引用してServiceIdを“MMアプリのパッケージ名” +
+    // “CトークンのGroupID” + “CトークンのTokenID”というString型に設定する動作の実装
     @Override
     public void onCreate() {
         //super.onCreate();

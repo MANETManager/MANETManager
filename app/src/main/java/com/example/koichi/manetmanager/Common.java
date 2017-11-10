@@ -9,11 +9,16 @@ import java.util.ArrayList;
  * アプリ内で(ログインアカウントの)グローバル変数を扱うクラス
  */
 
+//TODO: Cトークン関係のグローバル変数やメソッド、init()への初期値を追加
+
 public class Common extends Application {
+    /** グローバル変数の基本要素 **/
     private String username;
     private String password;
     private double mbod;
     private String macAddress;
+
+    /** グローバル変数の特定・保管用 **/
     private int listIndex; //ログインしているユーザーがaccountGroupのどこに格納されているかを示す
     private ArrayList<Accounts> accountGroup;
 

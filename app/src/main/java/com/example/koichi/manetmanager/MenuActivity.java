@@ -26,6 +26,8 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+//TODO: オフライン時かつCトークンをグローバル変数として保持している際にグループ一覧ボタンを押した場合、
+// グループ一覧画面を飛ばし、GdetailActivityを利用しGraphAPIなしで自身の所持しているCトークンの情報を表示する動作の実装
 
 public class MenuActivity extends AppCompatActivity {
 
