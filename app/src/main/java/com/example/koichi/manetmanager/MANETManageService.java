@@ -80,7 +80,7 @@ public class MANETManageService extends Service implements
      * このサービスIDを使用すると、同じことに関心のある近くの他の端末を見つけることができます。
      * このアプリは1つのことしか行わないため、私たちはIDを（アプリ側で）変更できないよう設定しました。
      */
-    private static final String SERVICE_ID =
+    private static String SERVICE_ID =
             "com.example.koichi.manetmanager.automatic.SERVICE_ID";
 
     /**
@@ -149,6 +149,16 @@ public class MANETManageService extends Service implements
     private boolean mIsAdvertising = false;
 
     final static String TAG = "MANETManageService";
+
+    /**
+     * DiscovererがAdvertiserを発見した際の、ミリ秒で表される時刻。
+     * connectToEndpoint()のNearbyAPIの直前にここへ保存する。
+     * 接続確立に失敗した際にもミリ秒の時刻を計測し、
+     * その差が一定以上（とりあえず8秒以上）である場合、接続の再試行をせずに切断する。
+     * データの入れ違いを防ぐべく通信確立成功時に0を代入し、
+     * 値が0の場合は各種条件分岐が偽になるようにする
+     */
+    private static long timeOfConnectToEndPoint;
 
     /**
      * 他のデバイスへの接続のコールバック
@@ -349,6 +359,8 @@ public class MANETManageService extends Service implements
 
         //super.onConnected(bundle);
         setState(State.SEARCHING);
+        //setDisState(dis_State.NORMAL);
+        //setAdvState(adv_State.STOP);
     }
 
     /** 切断された！ 全部停止！ */
@@ -365,6 +377,7 @@ public class MANETManageService extends Service implements
         setState(State.UNKNOWN);
     }
 
+    /** DiscoverがAdvertiserを発見した時 **/
     protected void onEndpointDiscovered(Endpoint endpoint) {
         Log.d(TAG,"onEndpointDiscovered");
 
@@ -372,7 +385,7 @@ public class MANETManageService extends Service implements
         builder.setContentText("onEndpointDiscovered");
         mNM.notify(1, builder.build());
 
-        // Advertiser発見！
+        // Advertiserへ通信を試みる
         connectToEndpoint(endpoint);
     }
 
@@ -455,15 +468,27 @@ public class MANETManageService extends Service implements
     }
 
     protected void onConnectionFailed(Endpoint endpoint) {
-        // 他の誰かを試そう。
         Log.d(TAG,"onConnectionFailed(Endpoint endpoint)");
 
         /** 通知 */
         builder.setContentText("onConnectionFailed(Endpoint endpoint)");
         mNM.notify(1, builder.build());
 
-        if (getState() == State.SEARCHING && !getDiscoveredEndpoints().isEmpty()) {
-            connectToEndpoint(pickRandomElem(getDiscoveredEndpoints()));
+        //依然探索状態であるか？（Discoverができない状況なら再試行する必要がない）
+        if (getDisState() == dis_State.NORMAL) {
+
+            //１回の接続要求に要した時間が異様に長いか？（8秒以上と仮定）
+            if(timeOfConnectToEndPoint != 0 && System.currentTimeMillis()-timeOfConnectToEndPoint > 8000) {
+                //１回の接続要求に要した時間が8秒以上の場合、接続先候補から現在の接続先を消去する
+                //※接続先候補が移動して通信圏外に動いた可能性を考慮
+                mDiscoveredEndpoints.remove(endpoint.getId());
+            }
+
+            //（接続先候補を削った場合を含めて）DiscoveredEndpointsマップが空ではないか？
+            if(!getDiscoveredEndpoints().isEmpty()) {
+                //DiscoveredEndpoints（接続先候補）からランダムに抽出して再試行
+                connectToEndpoint(pickRandomElem(getDiscoveredEndpoints()));
+            }
         }
     }
 
@@ -646,7 +671,10 @@ public class MANETManageService extends Service implements
                         });
     }
 
-    /** Discoverモードを停止する。 */
+    /**
+     * Discoverモードを停止する。
+     * startWaitByDiscovering()もこちらで止められる。
+     */
     protected void stopDiscovering() {
         mIsDiscovering = false;
         Nearby.Connections.stopDiscovery(mGoogleApiClient);
@@ -660,11 +688,81 @@ public class MANETManageService extends Service implements
     /** Discoverモードが正常に開始した。このメソッドをオーバーライドして、イベントを処理する。 */
     protected void onDiscoveryStarted() {
         Log.d(TAG,"onDiscoveryStarted");
+        timeOfConnectToEndPoint = 0; //値が0の場合は条件分岐が偽になるようにする
     }
 
     /** Discoveryモードの開始に失敗した。このメソッドをオーバーライドして、イベントを処理する。 */
     protected void onDiscoveryFailed() {
         Log.d(TAG,"onDiscoveryFailed");
+    }
+
+    /**
+     * Discoverモードを起動し、他端末からの各種メッセージの受信待機を行う。起動を実行すると、
+     * 結果に応じて{@link #onDiscoveryStarted()} ()} または {@link #onDiscoveryFailed()} ()}
+     * のいずれかが呼び出される。
+     */
+    protected void startWaitByDiscovering() {
+        Log.d(TAG,"startWaitByDiscovering");
+
+        /** 通知 */
+        builder.setContentText("startDiscovering");
+        mNM.notify(1, builder.build());
+
+        mIsDiscovering = true;
+        mDiscoveredEndpoints.clear();
+
+        /** Nearby Connections APIによる実際のDiscoveryモード起動 **/
+        Nearby.Connections.startDiscovery(
+                mGoogleApiClient,
+                getServiceId(),
+                new EndpointDiscoveryCallback() {
+                    @Override
+                    public void onEndpointFound(String endpointId, DiscoveredEndpointInfo info) {
+                        /** 通信相手（Advertiser）を発見した時のコールバック **/
+                        Log.d(TAG,
+                                String.format(
+                                        "onEndpointFound(endpointId=%s, serviceId=%s, endpointName=%s)",
+                                        endpointId, info.getServiceId(), info.getEndpointName()));
+                        /** もしも自身と通信相手のServiceIdが一致していたら **/
+                        if (getServiceId().equals(info.getServiceId())) {
+                            Endpoint endpoint = new Endpoint(endpointId, info.getEndpointName());
+                            mDiscoveredEndpoints.put(endpointId, endpoint);
+                            onEndpointDiscovered(endpoint);
+                        }
+                        /** ServiceIdが一致していなければ、Advertiserに対して何もしない＝通信を破棄する **/
+                    }
+
+                    @Override
+                    public void onEndpointLost(String endpointId) {
+                        Log.d(TAG,String.format("onEndpointLost(endpointId=%s)", endpointId));
+
+                        /** 通知 */
+                        builder.setContentText("onEndpointLost");
+                        mNM.notify(1, builder.build());
+                    }
+                },
+                new DiscoveryOptions(STRATEGY))
+                .setResultCallback(
+                        new ResultCallback<Status>() {
+                            @Override
+                            public void onResult(@NonNull Status status) {
+                                /** Nearby.Connections.startDiscovery()自体の成功/失敗結果に応じるコールバック ***/
+                                if (status.isSuccess()) {
+                                    onDiscoveryStarted();
+                                } else {
+                                    mIsDiscovering = false;
+                                    Log.w(TAG,
+                                            String.format(
+                                                    "Discovering failed. Received status "
+                                            ));
+                                    /** 通知 */
+                                    builder.setContentText("DiscoveryOptions: Discovering failed.");
+                                    mNM.notify(1, builder.build());
+
+                                    onDiscoveryFailed();
+                                }
+                            }
+                        });
     }
 
     protected void disconnect(Endpoint endpoint) {
@@ -690,6 +788,8 @@ public class MANETManageService extends Service implements
         // すでに接続要求を送信済みの場合は、 送信済みの接続要求の返事を待つ。
         // P2P_STAR は1つの発信接続のみを許可する。
         if (mIsConnecting) {
+            // 何かしようと思ったけど、既に見つけた相手は履歴MAPに登録済みだし
+            // メッセージの送信は接続確立後だからメッセージをストックする必要もない（できない）
             Log.w(TAG,"Already connecting, so ignoring this endpoint: " + endpoint);
             return;
         }
@@ -700,16 +800,21 @@ public class MANETManageService extends Service implements
         builder.setContentText("connectToEndpoint: Sending a connection request to endpoint " + endpoint);
         mNM.notify(1, builder.build());
 
-        // 自身が接続中であることを認識する（設定する？）ため、何度も接続をすることはない。
+        // 自身が接続試行中であることを設定するため、重複して何度も接続をすることはない。
         mIsConnecting = true;
 
-        // 接続要求
+        // 接続失敗時に時間的要因での再接続を行わないようにするために、接続要求したタイミングの時刻を記録
+        timeOfConnectToEndPoint = System.currentTimeMillis();
+
+        // Nearby Connections APIによる正式な接続要求
+        // 接続が確立できた場合はmConnectionLifecycleCallbackへ
         Nearby.Connections.requestConnection(
                 mGoogleApiClient, getName(), endpoint.getId(), mConnectionLifecycleCallback)
                 .setResultCallback(
                         new ResultCallback<Status>() {
                             @Override
                             public void onResult(@NonNull Status status) {
+                                /** 接続に失敗した場合 **/
                                 if (!status.isSuccess()) {
                                     Log.w(TAG,
                                             String.format(
@@ -845,30 +950,24 @@ public class MANETManageService extends Service implements
         // Nearby Connectionsを新しい状態に更新する。
         switch (newState) {
             case STOP:
-                /*
                 Log.d(TAG,"dis_State: STOP");
 
                 //通知
                 builder.setContentText("dis_State: STOP");
                 mNM.notify(2, builder.build());
 
-                disconnectFromAllEndpoints();
-                startDiscovering();
-                startAdvertising();
+                //disconnectFromAllEndpoints(); Cトークンの破棄を伝える関数
+                stopDiscovering();
                 break;
-                */
             case NORMAL:
-                /*
                 Log.d(TAG,"dis_state: NORMAL");
 
                 // 通知
                 builder.setContentText("dis_state: NORMAL");
                 mNM.notify(2, builder.build());
 
-                stopDiscovering();
-                stopAdvertising();
+                startWaitByDiscovering();
                 break;
-                */
             default:
                 // no-op
                 break;
