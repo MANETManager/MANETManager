@@ -2,8 +2,11 @@ package com.example.koichi.manetmanager;
 
 
 import android.Manifest;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
@@ -140,7 +143,6 @@ public class GDetailActivity extends AppCompatActivity {
     }
 
     /* boolean posting: trueならこの後にFacebookへの投稿も行う、falseならこの後にMANETManageServiceを起動する */
-    // TODO もしも自分がコミュニティトークン作成者ならFacebookに投稿する
 
     void requestAppPermissions(boolean posting){
         // Androidアプリのパーミッションを付与しているか確かめる
@@ -539,6 +541,18 @@ public class GDetailActivity extends AppCompatActivity {
 
     // MANETManageService(NearbyConnections)を起動する。
         startService(new Intent(getBaseContext(),MANETManageService.class));
+    }
+
+    // ネットワーク接続確認
+    //TODO: これを使って、オフライン時は自端末の持つコミュニティトークンだけを表示できるようにしたい
+    public static boolean netWorkCheck(Context context){
+        ConnectivityManager cm =  (ConnectivityManager)context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo info = cm.getActiveNetworkInfo();
+        if( info != null ){
+            return info.isConnected();
+        } else {
+            return false;
+        }
     }
 
 }
