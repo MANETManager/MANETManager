@@ -6,17 +6,10 @@
     <string name="input_macaddress"></string>
     <string name="facebook_app_id">1531881133535274</string>
     <string name="fb_login_protocol_scheme">fb1531881133535274</string>
-    <string-array name="spinner_MT">
-        <item>10分</item>
-        <item>20分</item>
-        <item>30分</item>
-        <item>40分</item>
-        <item>50分</item>
-    </string-array>
     <string-array name="spinner_MB">
-        <item>10%（SNS）</item>
-        <item>20%（ブラウザー）</item>
-        <item>30%（動画）</item>
+        <item>10%(SNS)</item>
+        <item>20%(ﾌﾞﾗｳｻﾞ)</item>
+        <item>30%(動画)</item>
     </string-array>
 
     <string name="error_missing_permissions">Cannot start without required permissions</string>

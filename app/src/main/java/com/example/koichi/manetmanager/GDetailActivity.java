@@ -2,8 +2,11 @@ package com.example.koichi.manetmanager;
 
 
 import android.Manifest;
+import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
@@ -33,6 +36,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.StringTokenizer;
@@ -40,26 +44,32 @@ import java.util.StringTokenizer;
 import android.app.ActivityManager;
 import android.app.ActivityManager.RunningServiceInfo;
 
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+
 /**
  * Created by Takami_res on 2017/08/15.
  */
 
-//TODO: GraphAPIを通してCトークンを取得したらそれをCommonクラスへグローバル変数として保存する動作の実装
-
 public class GDetailActivity extends AppCompatActivity {
 
     private static final int MY_PERMISSIONS_ACCESS_COARSE_LOCATION = 1;
-    private TextView tv_groupname, tv_groupid, tv_tokenid, tv_mb, tv_mt, tv_saddress, noticeMakeToken, MTMaketoken, MBMaketoken;
-    private Button btn_Create, btn_Delete;
-    private Spinner spinner_MT, spinner_MB;
-    int TokenMADEby = 0;
-    String group_id, group_name, group_tokenid, group_mb, group_mt, group_saddress, postid;
+    private TextView tv_groupname, tv_groupid, tv_tokenid, tv_mb, tv_saddress, noticeMakeToken, MBMaketoken;
+    private Button btn_Create, btn_Delete, btnSetNearby;
+    private Spinner spinner_MB;
+    String group_id, group_name, group_tokenid, group_mb, group_saddress, postid;
+    int orderOfGroupList;
     private static final String TAG = "GDetailActivity";
     CallbackManager callbackManager;
+
+    private Common common;
 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_gdetail);
+
+        //グローバル変数の取得
+        common = (Common) this.getApplication();
 
         // GroupActivityからのインテント取得準備
         Intent intent = getIntent();
@@ -67,21 +77,21 @@ public class GDetailActivity extends AppCompatActivity {
         group_name = intent.getStringExtra("group_name");
         // intent.putExtra("group_name", group_id[i]); を取得
         group_id = intent.getStringExtra("group_id");
+        orderOfGroupList = intent.getIntExtra("orderOfGroupList",0);
+        Toast.makeText(GDetailActivity.this, "orderOfGroupList: " + orderOfGroupList, Toast.LENGTH_SHORT).show();
 
         tv_groupname = (TextView) findViewById(R.id.tv_groupname);
         tv_groupid = (TextView) findViewById(R.id.tv_groupid);
         tv_tokenid = (TextView) findViewById(R.id.tv_tokenid);
         tv_mb = (TextView) findViewById(R.id.tv_mb);
-        tv_mt = (TextView) findViewById(R.id.tv_mt);
         tv_saddress = (TextView) findViewById(R.id.tv_saddress);
         noticeMakeToken = (TextView) findViewById(R.id.textView7);
-        MTMaketoken = (TextView) findViewById(R.id.textView8);
         MBMaketoken = (TextView) findViewById(R.id.textView9);
 
         btn_Create = (Button) findViewById(R.id.btnCreate);
         btn_Delete = (Button) findViewById(R.id.btnDelete);
+        btnSetNearby = (Button) findViewById(R.id.btnSetNearby);
 
-        spinner_MT = (Spinner) findViewById(R.id.spinner_MT);
         spinner_MB = (Spinner) findViewById(R.id.spinner_MB);
 
         // コミュニティトークン作成ボタンにクリックリスナー
@@ -138,10 +148,36 @@ public class GDetailActivity extends AppCompatActivity {
         });
         // btn_Delete.setOnClickListenerここまで
 
+        // コミュニティトークン作成ボタンにクリックリスナー
+        btnSetNearby.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                //確認ダイアログ
+                new AlertDialog.Builder(GDetailActivity.this)
+                        .setTitle("端末間通信開始")
+                        .setMessage("このコミュニティトークンを使用して端末間通信を行います。別のコミュニティトークンを既に使用している場合、上書きされます。")
+                        .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                // OK button pressed
+                                // いま表示しているコミュニティトークンを保存する
+                                preferToken();
+                            }
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show();
+            }
+        });
+        // btn_Create.setOnClickListenerここまで
+
         // グループ名とidをsetText
         tv_groupname.setText(group_name);
         tv_groupid.setText(group_id);
 
+    }
+
+    @Override public void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
     }
 
     /* boolean posting: trueならこの後にFacebookへの投稿も行う、falseならこの後にMANETManageServiceを起動する */
@@ -190,7 +226,6 @@ public class GDetailActivity extends AppCompatActivity {
                     // ユーザーが許可したとき
                     // 許可が必要な機能を改めて実行する
 
-                    // TODO もしも自分がコミュニティトークン作成者ならFacebookに投稿する
                     getFacebookPermission();
                 } else {
                     // ユーザーが許可しなかったとき
@@ -303,14 +338,12 @@ public class GDetailActivity extends AppCompatActivity {
                                         group_id = st.nextToken(); //値が変わらないとは思うけど念のため
                                         group_tokenid = st.nextToken();
                                         group_mb = st.nextToken();
-                                        group_mt = st.nextToken();
                                         group_saddress = st.nextToken();
 
                                         // コミュニティトークンの内容をsetText
                                         //tv_groupid.setText(group_id);
                                         tv_tokenid.setText(group_tokenid);
                                         tv_mb.setText(group_mb);
-                                        tv_mt.setText(group_mt);
                                         tv_saddress.setText(group_saddress);
 
                                         // このアクティビティでは最新のコミュニティトークンさえ取得できれば
@@ -329,18 +362,16 @@ public class GDetailActivity extends AppCompatActivity {
                             }
                             // for文でgroupObjectを一通り確認し終えた後
                             // グループにコミュニティトークンが存在したか否かを判断する
-                            if(TokenEXIST != 1){
+                            if(TokenEXIST == 0){
                                 // コミュニティトークンが存在しない
                                 // →自らの持っているコミュニティトークンの情報を破棄し、画面表示に反映する
                                 if(group_tokenid != "null") {
                                     group_tokenid = "null";
                                     group_mb = "null";
-                                    group_mt = "null";
                                     group_saddress = "null";
 
                                     tv_tokenid.setText(group_tokenid);
                                     tv_mb.setText(group_mb);
-                                    tv_mt.setText(group_mt);
                                     tv_saddress.setText(group_saddress);
                                 }
 
@@ -348,15 +379,18 @@ public class GDetailActivity extends AppCompatActivity {
                                 stopService(intent);
 
                                 // →コミュニティトークンを作成するためのボタンを表示
-                                //btn_Create.setVisibility(View.VISIBLE);
+                                btn_Create.setVisibility(View.VISIBLE);
                                 viewOfMaketoken(1);
                             }else {
                                 // コミュニティトークンが存在する
-
+                                viewOfMaketoken(0);
                                 // サービスは起動する
                                 requestAppPermissions(false);
+
                                 // そのコミュニティトークンを自らが作成したかを判別する
-                                if(TokenMADEby == 1 ){
+                                SharedPreferences sharedPreferences = getSharedPreferences("accounts", Context.MODE_PRIVATE); //インスタンス取得
+                                if(sharedPreferences.getBoolean(group_id, false)){
+                                    Toast.makeText(GDetailActivity.this, "true", Toast.LENGTH_LONG).show();
                                     // そのコミュニティトークンはワシが作った
                                     // コミュニティトークンを削除するボタンを表示
                                     btn_Delete.setVisibility(View.VISIBLE);
@@ -364,6 +398,7 @@ public class GDetailActivity extends AppCompatActivity {
                                 } else {
                                     // 自分が作っていない場合、
                                     // 特にコミュニティトークンに介入できる余地がない
+                                    Toast.makeText(GDetailActivity.this, "false", Toast.LENGTH_LONG).show();
                                 }
                             }
                         } catch (JSONException e) {
@@ -412,29 +447,22 @@ public class GDetailActivity extends AppCompatActivity {
         // コミュニティトークンに必要な端末情報を取得
         // Spinnerから選択したアイテムを取得する
         Spinner item_MB = (Spinner) findViewById(R.id.spinner_MB);
-        Spinner item_MT = (Spinner) findViewById(R.id.spinner_MT);
 
         String up_mb = (String) item_MB.getSelectedItem();
         if(up_mb != null && up_mb.length() > 0){
             up_mb = up_mb.substring(0, 2);
         }else Log.d(TAG, "postToFB(): error occurred while getting item_MB!");
 
-        String up_mt = (String) item_MT.getSelectedItem();
-        if(up_mt != null && up_mt.length() > 0){
-            up_mt = up_mt.substring(0, 2);
-        }else Log.d(TAG, "postToFB(): error occurred while getting item_MT!");
-
         // MACアドレス取得のために、Commonクラスのメソッドを新たに作成したインスタンス経由で呼び出す
-        Common common1 = new Common();
-        String up_tokenid  = common1.getMacAddress();
-        String up_saddress = common1.getMacAddress();
+        String up_tokenid  = common.getMacAddress();
+        String up_saddress = common.getMacAddress();
 
         // コミュニティトークンをアップロードするための文字列を作成する
         // ...ためのテキストバッファ
         StringBuffer stringBuffer = new StringBuffer();
 
         // テキストバッファにコミュニティトークンの形式に沿った各種文字列を追加
-        stringBuffer.append("Token," + group_id + "," + up_tokenid + "," + up_mb + "," + up_mt + "," + up_saddress);
+        stringBuffer.append("Token," + group_id + "," + up_tokenid + "," + up_mb + "," + up_saddress);
 
         Bundle params = new Bundle();
         params.putString("message",stringBuffer.toString());
@@ -460,7 +488,14 @@ public class GDetailActivity extends AppCompatActivity {
                         Toast.makeText(GDetailActivity.this, "コミュニティトークンを作成しました", Toast.LENGTH_LONG).show();
                         //btn_Create.setVisibility(View.GONE);
                         viewOfMaketoken(0);
-                        TokenMADEby = 1;
+
+                        //Cトークンの変更を保存
+                        SharedPreferences sharedPreferences = getSharedPreferences("accounts", Context.MODE_PRIVATE); //インスタンス取得
+                        SharedPreferences.Editor editor = sharedPreferences.edit(); //SharedPreferences.Editorオブジェクトを取得
+
+                        //設定データへString型でArrayList<Accounts> accountGroupオブジェクトをjson型で記述
+                        editor.putBoolean(group_id, true ).apply();
+
                         readFromFBgroup();
                         startNearbyConnections();
                     }
@@ -492,7 +527,13 @@ public class GDetailActivity extends AppCompatActivity {
                         Log.d(TAG, "deleteToFB(): " + response.getJSONObject());
                         Toast.makeText(GDetailActivity.this, "コミュニティトークンを削除しました", Toast.LENGTH_LONG).show();
                         btn_Delete.setVisibility(View.GONE);
-                        TokenMADEby = 0;
+
+                        SharedPreferences sharedPreferences = getSharedPreferences("accounts", Context.MODE_PRIVATE); //インスタンス取得
+                        SharedPreferences.Editor editor = sharedPreferences.edit(); //SharedPreferences.Editorオブジェクトを取得
+
+                        //設定データへString型でArrayList<Accounts> accountGroupオブジェクトをjson型で記述
+                        editor.putBoolean(group_id, false ).apply();
+
                         stopService(new Intent(getBaseContext(),MANETManageService.class));
                         readFromFBgroup();
                     }
@@ -505,22 +546,20 @@ public class GDetailActivity extends AppCompatActivity {
     void viewOfMaketoken(int selector){
         switch (selector){
             case 0:
-                //viewを非表示にする
+                //トークンが存在する
                 btn_Create.setVisibility(View.GONE);
                 noticeMakeToken.setVisibility(View.GONE);
                 MBMaketoken.setVisibility(View.GONE);
                 spinner_MB.setVisibility(View.GONE);
-                MTMaketoken.setVisibility(View.GONE);
-                spinner_MT.setVisibility(View.GONE);
+                btnSetNearby.setVisibility(View.VISIBLE);
                 break;
             case 1:
-                //viewを表示する
+                //トークンが存在しない
                 btn_Create.setVisibility(View.VISIBLE);
                 noticeMakeToken.setVisibility(View.VISIBLE);
                 MBMaketoken.setVisibility(View.VISIBLE);
                 spinner_MB.setVisibility(View.VISIBLE);
-                MTMaketoken.setVisibility(View.VISIBLE);
-                spinner_MT.setVisibility(View.VISIBLE);
+                btnSetNearby.setVisibility(View.GONE);
                 break;
             default:
                 Log.d(TAG, "viewOfMaketoken: selectorに予期せぬ値が代入されました");
@@ -542,7 +581,7 @@ public class GDetailActivity extends AppCompatActivity {
      **/
 
     // MANETManageService(NearbyConnections)を起動する。
-        startService(new Intent(getBaseContext(),MANETManageService.class));
+        //startService(new Intent(getBaseContext(),MANETManageService.class));
     }
 
     // ネットワーク接続確認
@@ -555,6 +594,39 @@ public class GDetailActivity extends AppCompatActivity {
         } else {
             return false;
         }
+    }
+
+    /*
+     * グローバル関数commonにおいてgetAccountGroup()メソッドで
+     * Accounts型を収納するArrayListからListIndex【今ログインしてる垢】番目のAccounts型を呼び出し
+     * そのAccountsに対してGDetailActivityが持つCトークンの情報を保存する
+    **/
+    public void preferToken(){
+        Log.d(TAG, "preferToken()");
+
+        common.getAccountGroup().get(common.getListIndex()).setGroupId(group_id);
+        common.getAccountGroup().get(common.getListIndex()).setGroupId(group_id);
+        Log.d(TAG, common.getAccountGroup().get(common.getListIndex()).getGroupId(),null);
+        common.getAccountGroup().get(common.getListIndex()).setGroupName(group_name);
+        common.getAccountGroup().get(common.getListIndex()).setTokenId(group_tokenid);
+        common.getAccountGroup().get(common.getListIndex()).setTokenMbod(group_mb);
+        common.getAccountGroup().get(common.getListIndex()).setSourceAddress(group_saddress);
+        common.getAccountGroup().get(common.getListIndex()).setPostId(postid);
+        common.setTokenIndex(common.getListIndex());
+        Gson gson = new Gson();
+
+        //SharedPreferences:アプリの設定データをデバイス内に保存する
+        SharedPreferences sharedPreferences = getSharedPreferences("accounts", Context.MODE_PRIVATE); //インスタンス取得
+        SharedPreferences.Editor editor = sharedPreferences.edit(); //SharedPreferences.Editorオブジェクトを取得
+
+        //設定データへString型でArrayList<Accounts> accountGroupオブジェクトをjson型で記述
+        editor.putString("accountJson", gson.toJson(common.getAccountGroup())).apply();
+        Log.d(TAG, sharedPreferences.getString("accountJson", null) );
+
+        ArrayList<Accounts> accountList = gson.fromJson(sharedPreferences.getString("accountJson", null), new TypeToken<ArrayList<Accounts>>(){}.getType());
+        Log.d(TAG, accountList.get(0).getGroupId(),null);
+
+
     }
 
 }

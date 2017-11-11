@@ -1,6 +1,7 @@
 package com.example.koichi.manetmanager;
 
 import android.app.Application;
+import android.widget.Toast;
 
 import java.util.ArrayList;
 
@@ -8,8 +9,6 @@ import java.util.ArrayList;
  * Created by Koichi on 2017/08/16.
  * アプリ内で(ログインアカウントの)グローバル変数を扱うクラス
  */
-
-//TODO: Cトークン関係のグローバル変数やメソッド、init()への初期値を追加
 
 public class Common extends Application {
     /** グローバル変数の基本要素 **/
@@ -20,8 +19,10 @@ public class Common extends Application {
 
     /** グローバル変数の特定・保管用 **/
     private int listIndex; //ログインしているユーザーがaccountGroupのどこに格納されているかを示す
+    private int tokenIndex;
     private ArrayList<Accounts> accountGroup;
 
+    /** 基本要素セット・取得 **/
     public void setUsername(String string){ username = string; }
     public String getUsername(){ return username; }
 
@@ -34,8 +35,12 @@ public class Common extends Application {
     public void setMacAddress(String string){ macAddress = string; }
     public String getMacAddress(){ return macAddress; }
 
+    /** グローバル変数特定・保管用関係 **/
     public void setListIndex(int number){ listIndex = number; }
     public int getListIndex(){ return listIndex; }
+
+    public void setTokenIndex(int number){ tokenIndex = number; }
+    public int getTokenIndex(){ return tokenIndex; }
 
     public void setAccountGroup(ArrayList<Accounts> list){ accountGroup = list; }
     public ArrayList<Accounts> getAccountGroup(){ return accountGroup; }

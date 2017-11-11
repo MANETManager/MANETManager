@@ -2,6 +2,7 @@ package com.example.koichi.manetmanager;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.graphics.Color;
 import android.net.ConnectivityManager;
@@ -23,11 +24,14 @@ import com.facebook.GraphRequest;
 import com.facebook.GraphRequestAsyncTask;
 import com.facebook.GraphResponse;
 import com.facebook.HttpMethod;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.StringTokenizer;
@@ -40,10 +44,14 @@ public class GroupActivity extends AppCompatActivity {
     Button btnGroup[]; //ボタン:メンバー変数
     private static final String TAG = "GroupActivity";
 
+    private Common common;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_group);
+
+        common = (Common) this.getApplication();
 
         int MATCH_PARENT = ViewGroup.LayoutParams.MATCH_PARENT;
         int btnId; // ボタンのリソースIDを取得するためのint
@@ -83,6 +91,7 @@ public class GroupActivity extends AppCompatActivity {
                         Intent intent = new Intent(getApplication(), GDetailActivity.class);
                         intent.putExtra("group_name", group_name[i]);
                         intent.putExtra("group_id", group_id[i]);
+                        intent.putExtra("orderOfGroupList",i);
                         startActivity(intent);
 
                         //Log.i(TAG, "TEST: " + group_name[i]);
@@ -137,6 +146,7 @@ public class GroupActivity extends AppCompatActivity {
                                     // 書き込みにname・idが存在しないのでスルーする
                                 }
                             }
+
                             // setText変更した分を再描画
                             for(int i=0;i<group_num;i++) {
                                 btnGroup[i].setText(group_name[i]);

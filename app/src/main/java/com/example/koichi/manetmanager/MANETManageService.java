@@ -3,6 +3,7 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Binder;
 import android.os.IBinder;
 import android.Manifest;
@@ -35,6 +36,9 @@ import com.google.android.gms.nearby.connection.Payload;
 import com.google.android.gms.nearby.connection.PayloadCallback;
 import com.google.android.gms.nearby.connection.PayloadTransferUpdate;
 import com.google.android.gms.nearby.connection.Strategy;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -78,10 +82,9 @@ public class MANETManageService extends Service implements
 
     /**
      * このサービスIDを使用すると、同じことに関心のある近くの他の端末を見つけることができます。
-     * このアプリは1つのことしか行わないため、私たちはIDを（アプリ側で）変更できないよう設定しました。
+     *
      */
-    private static String SERVICE_ID =
-            "com.example.koichi.manetmanager.automatic.SERVICE_ID";
+    private String SERVICE_ID;
 
     /**
      * アプリの状態。アプリが状態を変えるとUIが更新され、Advertise/Discoverが開始/停止されます。
@@ -269,12 +272,22 @@ public class MANETManageService extends Service implements
     }
 
     // サービス作成時
-    //TODO: グローバル変数の値から引用してServiceIdを“MMアプリのパッケージ名” +
-    // “CトークンのGroupID” + “CトークンのTokenID”というString型に設定する動作の実装
     @Override
     public void onCreate() {
         //super.onCreate();
         Log.d(TAG, "onCreate");
+
+        // サービスID作成用に端末セーブデータを呼び出す
+        Common common = (Common) this.getApplication();
+        SharedPreferences sharedPreferences = getSharedPreferences("accounts", Context.MODE_PRIVATE);
+        Gson gson = new Gson();
+        ArrayList<Accounts> accountList = gson.fromJson(sharedPreferences.getString("accountJson", null), new TypeToken<ArrayList<Accounts>>(){}.getType());
+
+        //ServiceIdを“MMアプリのパッケージ名（固定値）” + "CトークンのGroupId"に設定
+        //TODO: "CトークンのTokenID"に変える必要はあるか？
+        SERVICE_ID = "com.example.koichi.manetmanager"+ accountList.get(common.getListIndex()).getGroupId();
+
+        Log.d(TAG, SERVICE_ID);
 
         // mName (端末識別ID) にMACアドレスを用いる
         Common common1 = new Common();

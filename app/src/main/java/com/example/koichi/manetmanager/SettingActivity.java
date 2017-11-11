@@ -102,6 +102,7 @@ public class SettingActivity extends AppCompatActivity {
                         double double_mbod = parseDouble(string_mbod);
                         mbod.setText(string_mbod);
                         common.setMbod(double_mbod); //グローバル関数に代入
+
                     }
                 });
 
@@ -176,7 +177,7 @@ public class SettingActivity extends AppCompatActivity {
                 //端末内に情報を保存
                 //下2行がもうちょいすっきりできる気がするww
                 //Accounts型を収納するArrayListからgetメソッドで【今ログインしてる垢】番目のAccounts型を呼び出し
-                //そのAccountsについてMbodとMacAddressを保存する
+                //そのAccountsについてグローバル変数のMbodとMacAddressを保存する
                 common.getAccountGroup().get(common.getListIndex()).setMbod(common.getMbod());
                 common.getAccountGroup().get(common.getListIndex()).setMacAddress(common.getMacAddress());
                 Gson gson = new Gson();

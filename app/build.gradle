@@ -15,6 +15,7 @@ apply plugin: 'com.android.application'
 // FacebookSDKのインポートに必要
 repositories {
     maven { url 'http://repo1.maven.org/maven2' }
+    maven {url "https://clojars.org/repo/"} //Icepick
 }
 
 // Google play service API(nearby connections)のインポートに必要
@@ -56,12 +57,12 @@ dependencies {
     //Facebook SDK
     //Google Play Services SDK の中のnearbyに関するものだけを部分的にコンパイル
     //SharedPreferencesで配列を扱うためのGSONライブラリ
-    compile 'com.android.support:appcompat-v7:26.0.0-alpha1'
-    compile 'com.android.support:cardview-v7:26.0.0-alpha1'
-    compile 'com.android.support:customtabs:26.0.0-alpha1'
+    compile 'com.android.support:appcompat-v7:26.1.0'
+    compile 'com.android.support:cardview-v7:26.1.0'
+    compile 'com.android.support:customtabs:26.1.0'
     compile 'com.android.support.constraint:constraint-layout:1.0.2'
     compile 'junit:junit:4.12'
-    compile 'com.facebook.android:facebook-android-sdk:[4,5)'
+    compile 'com.facebook.android:facebook-android-sdk:4.28.0'
     compile 'com.google.android.gms:play-services-nearby:11.4.2'
-    compile 'com.google.code.gson:gson:2.7'
+    compile 'com.google.code.gson:gson:2.8.0'
 }
