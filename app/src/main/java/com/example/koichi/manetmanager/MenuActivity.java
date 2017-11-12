@@ -32,6 +32,7 @@ import org.json.JSONObject;
 public class MenuActivity extends AppCompatActivity {
 
     private static final String TAG = "MenuActivity";
+    private Common common;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -71,6 +72,9 @@ public class MenuActivity extends AppCompatActivity {
         btnGraphApiTest.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                common = (Common) MenuActivity.this.getApplication();
+                Toast.makeText(MenuActivity.this, "common.MACaddress: " + common, Toast.LENGTH_LONG).show();
+                /*
                 switch (v.getId()) {
                     case R.id.btnGraphApiTest:
                         // Graph API自体がネットワーク接続を考慮しようとしないので別途チェック
@@ -86,6 +90,8 @@ public class MenuActivity extends AppCompatActivity {
                     default:
 
                 }
+                :
+               */
             }
         });
 

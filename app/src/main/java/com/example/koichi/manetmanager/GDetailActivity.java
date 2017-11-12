@@ -456,6 +456,7 @@ public class GDetailActivity extends AppCompatActivity {
         // MACアドレス取得のために、Commonクラスのメソッドを新たに作成したインスタンス経由で呼び出す
         String up_tokenid  = common.getMacAddress();
         String up_saddress = common.getMacAddress();
+        Log.d(TAG, "MAC: "+ up_tokenid + ", " +up_saddress);
 
         // コミュニティトークンをアップロードするための文字列を作成する
         // ...ためのテキストバッファ

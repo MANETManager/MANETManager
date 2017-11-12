@@ -4,6 +4,8 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Binder;
 import android.os.IBinder;
 import android.Manifest;
@@ -163,6 +165,13 @@ public class MANETManageService extends Service implements
      */
     private static long timeOfConnectToEndPoint;
 
+    /*
+     * デスティネーションノードのアドレス、今回の研究では固定値となる
+     */
+    private final String mDestinationAddress = "33:33:33:33:33:33";
+
+    private Common common;
+
     /**
      * 他のデバイスへの接続のコールバック
      */
@@ -183,6 +192,7 @@ public class MANETManageService extends Service implements
                     MANETManageService.this.onConnectionInitiated(endpoint, connectionInfo);
                 }
 
+                /** Initiateした端末同士が互いにrejectかacceptを行った **/
                 @Override
                 public void onConnectionResult(String endpointId, ConnectionResolution result) {
                     Log.d(TAG, String.format("onConnectionResponse(endpointId=%s, result=%s)", endpointId, result));
@@ -278,21 +288,21 @@ public class MANETManageService extends Service implements
         Log.d(TAG, "onCreate");
 
         // サービスID作成用に端末セーブデータを呼び出す
-        Common common = (Common) this.getApplication();
-        SharedPreferences sharedPreferences = getSharedPreferences("accounts", Context.MODE_PRIVATE);
-        Gson gson = new Gson();
-        ArrayList<Accounts> accountList = gson.fromJson(sharedPreferences.getString("accountJson", null), new TypeToken<ArrayList<Accounts>>(){}.getType());
+        common = (Common) this.getApplication();
+        ArrayList<Accounts> accountList = common.getAccountGroup();
 
-        //ServiceIdを“MMアプリのパッケージ名（固定値）” + "CトークンのGroupId"に設定
+        //ServiceIdを“MMアプリのパッケージ名（固定値）,” + "CトークンのGroupId" + "," + Cトークンのに設定
         //TODO: "CトークンのTokenID"に変える必要はあるか？
-        SERVICE_ID = "com.example.koichi.manetmanager"+ accountList.get(common.getListIndex()).getGroupId();
+        SERVICE_ID = "com.example.koichi.manetmanager,"+ accountList.get(common.getListIndex()).getGroupId()
+                + "," + accountList.get(common.getListIndex()).getTokenId();
 
-        Log.d(TAG, SERVICE_ID);
+        Log.d(TAG, "SERVICE_ID is :" + SERVICE_ID);
 
         // mName (端末識別ID) にMACアドレスを用いる
-        Common common1 = new Common();
         // mName = generateRandomName();
-        mName = common1.getMacAddress();
+        mName = common.getMacAddress();
+        Log.d(TAG, "mName is " + mName);
+
         if (hasPermissions(this, getRequiredPermissions() ) ) {
             createGoogleApiClient();
         } else {
@@ -411,16 +421,71 @@ public class MANETManageService extends Service implements
      * {@link #rejectConnection(Endpoint)}を呼び出します。.
      */
     protected void onConnectionInitiated(Endpoint endpoint, ConnectionInfo connectionInfo) {
+        /** 通知 **/
+        builder.setContentText("onConnectionInitiated");
+        mNM.notify(1, builder.build());
+
         // 別のデバイスへの接続が開始された！ 両方の端末で同じ認証トークンを使用して、接続時に使用する色を選択する。
         // これにより、ユーザーは接続先のデバイスを視覚的に確認できます。
         // mConnectedColor = COLORS[connectionInfo.getAuthenticationToken().hashCode() % COLORS.length];
 
-        /** 通知 */
-        builder.setContentText("onConnectionInitiated");
-        mNM.notify(1, builder.build());
+        //TODO: 共通鍵云々を実装するならばこの辺りか？
+        if(connectionInfo.isIncomingConnection() == false)
+        {
+            //自分がDiscovererのとき
+            //自端末のMACアドレスをmNameに入れて利用しているはずなので、それを流用する
+            if(mName == mDestinationAddress){
+                //TODO:自分がDiscovererかつデスティノードのとき
+                //TODO:デスティネーションノードとアクセスポイントのアソシエーションがある／ない
+                /**
+                 * Wi-Fi使って他端末とConnectionInitiatedしてる可能性あるのにどうするの？大丈夫？
+                 * 最悪、今回の研究においては「デスティネーションノード端末は固定」
+                 * として、グローバル変数のMacAddress = MMServiceにおける固定値のアドレス
+                 * ならばその端末がデスティであり、通信切り替えすればアクセスポイントへすぐ接続
+                 * できるものという前提で話を進めるしかない
+                 */
+                //とりあえず以下のソースで拾える"Wi-Fi"が"Wi-Fi Direct"を含まないという前提で
+                //まあNearby実行中にこれが両方Trueになることは無いと思っている
 
-        // すぐに接続を受け入れる。
-        acceptConnection(endpoint);
+                ConnectivityManager connectivityManager =
+                        (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+                @Nullable NetworkInfo networkInfo = connectivityManager.getActiveNetworkInfo();
+                if (networkInfo != null && networkInfo.getType() == ConnectivityManager.TYPE_WIFI){
+                    //Wi-Fiでネットワークがアクティブになってる
+                    acceptConnection(endpoint);
+                }else{
+                    //それ以外
+                    rejectConnection(endpoint);
+                }
+            }else{
+                ArrayList<Accounts> accountList = common.getAccountGroup();
+                if( mName == accountList.get(common.getListIndex()).getSourceAddress() ){
+                    //自分がDiscovererかつソースノードのとき
+                    // すぐに接続を受け入れる。
+                    acceptConnection(endpoint);
+                }else {
+                    //自分がDiscovererかつ中継ノードのとき
+                    /**
+                    * if(中継ノードのGroupID == メッセージ内のGroupID) &&
+                    * if(中継ノードのTokenID == メッセージ内のTokenID)は
+                    * SERVICE_IDが一致し通信確立を行えた時点で成立している
+                    **/
+                    if(common.getMbod() <= 0){
+                        //グローバル変数のMbod（自端末バッテリー消費許容量の残り）が0かそれ以下
+                        rejectConnection(endpoint);
+                        return;
+                    }else {
+                        //メッセージ残量に問題が見られない
+                        //accept後、メッセージを受け取って解析へ
+                        acceptConnection(endpoint);
+                    }
+                }
+            }
+        }else{
+            // 自分がAdvertiserのとき
+            // すぐに接続を受け入れる。
+            acceptConnection(endpoint);
+        }
     }
 
     private void connectedToEndpoint(Endpoint endpoint) {
@@ -829,7 +894,8 @@ public class MANETManageService extends Service implements
                         new ResultCallback<Status>() {
                             @Override
                             public void onResult(@NonNull Status status) {
-                                /** 接続に失敗した場合 **/
+                                //TODO: 「接続確立した際、自端末がAdvertise／Discoverとして接続確立した」ことを示すboolean変数
+                                //あくまでもNearby.Connections.requestConnection自体の実行に成功したか否か、らしい
                                 if (!status.isSuccess()) {
                                     Log.w(TAG,
                                             String.format(
@@ -841,6 +907,9 @@ public class MANETManageService extends Service implements
 
                                     mIsConnecting = false;
                                     onConnectionFailed(endpoint);
+                                }else{
+                                    /** 接続に成功した場合のはず **/
+
                                 }
                             }
                         });
@@ -1281,6 +1350,8 @@ public class MANETManageService extends Service implements
         }
         return name;
     }
+
+    //TODO: 自端末のMBODを減少させるメソッドが要る？
 
 }
 

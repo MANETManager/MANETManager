@@ -83,7 +83,7 @@
 
     <TextView
         android:id="@+id/text_macAddress"
-        android:layout_width="219dp"
+        android:layout_width="260dp"
         android:layout_height="40dp"
         android:layout_marginBottom="24dp"
         android:gravity="center"
