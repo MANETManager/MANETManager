@@ -320,13 +320,11 @@ public class GDetailActivity extends AppCompatActivity {
                                     // 書き込みのメッセージを取得
                                     String message = groupObject[i].getString("message");
 
-                                    // StringTokenizerオブジェクトの生成
                                     // 書き込みのmessageをカンマで区切って区切られた部分を順番に取得
-                                    StringTokenizer st = new StringTokenizer(message , ",");
+                                    String[] st = message.split(",");
 
-                                    // 1つ目のトークンを先に取得
                                     // message内容の1つ目のトークンで書き込み内容の概要を特定する
-                                    String judge = st.nextToken();
+                                    String judge = st[0];
 
                                     // コミュニティトークンは1つ目のカンマまでの文字が"Token"で固定される
                                     if(judge.equals("Token") == true)
@@ -335,10 +333,10 @@ public class GDetailActivity extends AppCompatActivity {
                                         TokenEXIST = 1; //コミュニティトークンが存在するので1にする
 
                                         // コミュニティトークンの内容を読み込む
-                                        group_id = st.nextToken(); //値が変わらないとは思うけど念のため
-                                        group_tokenid = st.nextToken();
-                                        group_mb = st.nextToken();
-                                        group_saddress = st.nextToken();
+                                        group_id = st[1]; //値が変わらないとは思うけど念のため
+                                        group_tokenid = st[2];
+                                        group_mb = st[3];
+                                        group_saddress = st[4];
 
                                         // コミュニティトークンの内容をsetText
                                         //tv_groupid.setText(group_id);

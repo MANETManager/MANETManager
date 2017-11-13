@@ -50,6 +50,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.StringTokenizer;
+
+import static java.lang.Integer.parseInt;
 
 public class MANETManageService extends Service implements
         GoogleApiClient.ConnectionCallbacks,
@@ -120,7 +123,9 @@ public class MANETManageService extends Service implements
     private final Map<String, Endpoint> mDiscoveredEndpoints = new HashMap<>();
 
     /**
-     * 接続保留中のデバイスのマップ。 こちらの端末が {@link #acceptConnection(Endpoint)}か
+     * 接続保留中のデバイスのマップ。 こちらの端末が
+     * {@link #acceptConnectionByDiscoverer(Endpoint)}か
+     * {@link #acceptConnectionByAdvertiser(Endpoint)}か
      * {@link #rejectConnection(Endpoint)}を呼び出すまで、それらは保留になる。
      */
     private final Map<String, Endpoint> mPendingConnections = new HashMap<>();
@@ -132,7 +137,7 @@ public class MANETManageService extends Service implements
     private final Map<String, Endpoint> mEstablishedConnections = new HashMap<>();
 
     /**
-     * String型（今のところ終点ノードアドレスを想定）と関係するRouteList（経路表クラス）のマップ。
+     * String型（各経路表の終点ノードアドレスを想定）と関係するRouteList（経路表クラス）のマップ。
      * 端末が知っている宛先の数だけ、このMapの要素数とRouteListが存在する。はず。
      */
     private final Map<String, RouteList> mRouteLists = new HashMap<>();
@@ -152,6 +157,14 @@ public class MANETManageService extends Service implements
      * こちらの端末がAdvertise中の場合はtrue
      */
     private boolean mIsAdvertising = false;
+
+    /**
+     * {@link #onReceiveByDiscoverer(Endpoint, Payload)}{@link #onReceiveByAdvertiser(Endpoint, Payload)}
+     * で使用。RREQ,RREPメッセージのやり取りにおいて、
+     * Discoverer: Advertiserからメッセージを受信し、相手への返送に成功したらTrue
+     * Advertiser: Discovererへメッセージを送信成功したらTrue
+     */
+    private boolean mIsReceiving = false;
 
     final static String TAG = "MANETManageService";
 
@@ -235,28 +248,60 @@ public class MANETManageService extends Service implements
             };
 
     /**
-     * 他の端末から自分へ送信されたペイロード（データのバイト）のコールバック。
+     * 他の端末から自分へ送信されたペイロード（データのバイト）のコールバック
+     * ただし、こちらはDiscovererが用いる。
      */
-    private final PayloadCallback mPayloadCallback =
+    private final PayloadCallback mPayloadCallbackByDiscoverer =
             new PayloadCallback() {
                 @Override
                 public void onPayloadReceived(String endpointId, Payload payload) {
-                    Log.d(TAG, String.format("onPayloadReceived(endpointId=%s, payload=%s)", endpointId, payload));
+                    //相手から送られてきたsendPayload()の中身を受け取る
+                    Log.d(TAG, String.format("onPayloadReceivedByDiscoverer(endpointId=%s, payload=%s)", endpointId, payload));
 
                     /** 通知 */
-                    builder.setContentText("onPayloadReceived");
+                    builder.setContentText("onPayloadReceivedByDiscoverer");
                     mNM.notify(1, builder.build());
 
-                    onReceive(mEstablishedConnections.get(endpointId), payload);
+                    //受け取ったPayloadの処理や返送・転送
+                    onReceiveByDiscoverer(mEstablishedConnections.get(endpointId), payload);
                 }
 
                 @Override
                 public void onPayloadTransferUpdate(String endpointId, PayloadTransferUpdate update) {
                     Log.d(TAG,
                             String.format(
-                                    "onPayloadTransferUpdate(endpointId=%s, update=%s)", endpointId, update));
+                                    "onPayloadTransferUpdateByDiscoverer(endpointId=%s, update=%s)", endpointId, update));
                     /** 通知 */
-                    builder.setContentText("onPayloadTransferUpdate");
+                    builder.setContentText("onPayloadTransferUpdateByDiscoverer");
+                    mNM.notify(1, builder.build());
+                }
+            };
+
+    /**
+     * 他の端末から自分へ送信されたペイロード（データのバイト）のコールバック
+     * ただし、こちらはAdvertiserが用いる。
+     */
+    private final PayloadCallback mPayloadCallbackByAdvertiser =
+            new PayloadCallback() {
+                @Override
+                public void onPayloadReceived(String endpointId, Payload payload) {
+                    //相手から送られてきたsendPayload()の中身を受け取る
+                    Log.d(TAG, String.format("onPayloadReceivedByAdvertiser(endpointId=%s, payload=%s)", endpointId, payload));
+
+                    /** 通知 */
+                    builder.setContentText("onPayloadReceivedByAdvertiser");
+                    mNM.notify(1, builder.build());
+
+                    onReceiveByAdvertiser(mEstablishedConnections.get(endpointId), payload);
+                }
+
+                @Override
+                public void onPayloadTransferUpdate(String endpointId, PayloadTransferUpdate update) {
+                    Log.d(TAG,
+                            String.format(
+                                    "onPayloadTransferUpdateByAdvertiser(endpointId=%s, update=%s)", endpointId, update));
+                    /** 通知 */
+                    builder.setContentText("onPayloadTransferUpdatByAdvertisere");
                     mNM.notify(1, builder.build());
                 }
             };
@@ -417,7 +462,8 @@ public class MANETManageService extends Service implements
     /**
      * リモートエンドポイントとの保留接続が作成された。接続に関するメタデータ（着信と発信、認証トークンなど）
      * には {@link ConnectionInfo} を使用してください。接続を継続（再開？）したい場合は,
-     * {@link #acceptConnection(Endpoint)}を呼び出してください。それ以外の場合は、
+     * {@link #acceptConnectionByDiscoverer(Endpoint)}か
+     * {@link #acceptConnectionByAdvertiser(Endpoint)}を呼び出してください。それ以外の場合は、
      * {@link #rejectConnection(Endpoint)}を呼び出します。.
      */
     protected void onConnectionInitiated(Endpoint endpoint, ConnectionInfo connectionInfo) {
@@ -452,7 +498,7 @@ public class MANETManageService extends Service implements
                 @Nullable NetworkInfo networkInfo = connectivityManager.getActiveNetworkInfo();
                 if (networkInfo != null && networkInfo.getType() == ConnectivityManager.TYPE_WIFI){
                     //Wi-Fiでネットワークがアクティブになってる
-                    acceptConnection(endpoint);
+                    acceptConnectionByDiscoverer(endpoint);
                 }else{
                     //それ以外
                     rejectConnection(endpoint);
@@ -462,7 +508,7 @@ public class MANETManageService extends Service implements
                 if( mName == accountList.get(common.getListIndex()).getSourceAddress() ){
                     //自分がDiscovererかつソースノードのとき
                     // すぐに接続を受け入れる。
-                    acceptConnection(endpoint);
+                    acceptConnectionByDiscoverer(endpoint);
                 }else {
                     //自分がDiscovererかつ中継ノードのとき
                     /**
@@ -477,14 +523,14 @@ public class MANETManageService extends Service implements
                     }else {
                         //メッセージ残量に問題が見られない
                         //accept後、メッセージを受け取って解析へ
-                        acceptConnection(endpoint);
+                        acceptConnectionByDiscoverer(endpoint);
                     }
                 }
             }
         }else{
             // 自分がAdvertiserのとき
             // すぐに接続を受け入れる。
-            acceptConnection(endpoint);
+            acceptConnectionByAdvertiser(endpoint);
         }
     }
 
@@ -527,6 +573,11 @@ public class MANETManageService extends Service implements
         /** 通知 */
         builder.setContentText("onEndpointDisconnected");
         mNM.notify(1, builder.build());
+
+        //TODO: Discovererが受け取ったメッセージを基に新たなメッセージを作成・送信
+        if(mIsReceiving == true){
+
+        }
 
         Toast.makeText(
                 this, getString(R.string.toast_disconnected, endpoint.getName()), Toast.LENGTH_SHORT)
@@ -648,10 +699,10 @@ public class MANETManageService extends Service implements
         Log.d(TAG,"onAdvertisingFailed");
     }
 
-
-    /** 接続要求を受け入れる。 */
-    protected void acceptConnection(final Endpoint endpoint) {
-        Nearby.Connections.acceptConnection(mGoogleApiClient, endpoint.getId(), mPayloadCallback)
+    //TODO: PayloadCallbackを適用する
+    /** Discovererが接続要求を受け入れる。（Discover用のPayloadCallbackを使用） */
+    protected void acceptConnectionByDiscoverer(final Endpoint endpoint) {
+        Nearby.Connections.acceptConnection(mGoogleApiClient, endpoint.getId(), mPayloadCallbackByDiscoverer)
                 .setResultCallback(
                         new ResultCallback<Status>() {
                             @Override
@@ -659,15 +710,34 @@ public class MANETManageService extends Service implements
                                 if (!status.isSuccess()) {
                                     Log.w(TAG,
                                             String.format(
-                                                    "acceptConnection failed."));
+                                                    "acceptConnectionByDiscoverer failed."));
                                     /** 通知 */
-                                    builder.setContentText("acceptConnection: acceptConnection failed.");
+                                    builder.setContentText("acceptConnectionByDiscoverer: acceptConnection failed.");
                                     mNM.notify(1, builder.build());
                                 }
                             }
                         });
     }
 
+    //TODO: PayloadCallbackを適用する
+    /** Advertiserが接続要求を受け入れる。（Advertiser用のPayloadCallbackを使用） */
+    protected void acceptConnectionByAdvertiser(final Endpoint endpoint) {
+        Nearby.Connections.acceptConnection(mGoogleApiClient, endpoint.getId(), mPayloadCallbackByAdvertiser)
+                .setResultCallback(
+                        new ResultCallback<Status>() {
+                            @Override
+                            public void onResult(@NonNull Status status) {
+                                if (!status.isSuccess()) {
+                                    Log.w(TAG,
+                                            String.format(
+                                                    "acceptConnectionByAdvertiser failed."));
+                                    /** 通知 */
+                                    builder.setContentText("acceptConnectionByAdvertiser: acceptConnection failed.");
+                                    mNM.notify(1, builder.build());
+                                }
+                            }
+                        });
+    }
     /** 接続要求を拒否する。 */
     protected void rejectConnection(Endpoint endpoint) {
         Nearby.Connections.rejectConnection(mGoogleApiClient, endpoint.getId())
@@ -1034,13 +1104,15 @@ public class MANETManageService extends Service implements
         // Nearby Connectionsを新しい状態に更新する。
         switch (newState) {
             case STOP:
+                //TODO: STOPになっていてサービス起動中にコミュニティトークン取得した場合
+                //どうやって復帰すればいいの？
                 Log.d(TAG,"dis_State: STOP");
 
                 //通知
                 builder.setContentText("dis_State: STOP");
                 mNM.notify(2, builder.build());
 
-                //disconnectFromAllEndpoints(); Cトークンの破棄を伝える関数
+                //disconnectFromAllEndpoints(); //Cトークンの破棄を伝える関数
                 stopDiscovering();
                 break;
             case NORMAL:
@@ -1050,7 +1122,14 @@ public class MANETManageService extends Service implements
                 builder.setContentText("dis_state: NORMAL");
                 mNM.notify(2, builder.build());
 
-                startWaitByDiscovering();
+                //コミュニティトークンを持っているか確認
+                if(common.getAccountGroup().get(common.getListIndex()).getTokenId() != null) {
+                    //あるならDiscover開始してAdvertiseを待つ
+                    startWaitByDiscovering();
+                }else{
+                    //ないならSTOPに戻す
+                    setDisState(dis_State.STOP);
+                }
                 break;
             default:
                 // no-op
@@ -1096,7 +1175,6 @@ public class MANETManageService extends Service implements
         // Nearby Connectionsを新しい状態に更新する。
         switch (newState) {
             case STOP:
-                /*
                 Log.d(TAG,"dis_State: STOP");
 
                 //通知
@@ -1104,10 +1182,7 @@ public class MANETManageService extends Service implements
                 mNM.notify(2, builder.build());
 
                 disconnectFromAllEndpoints();
-                startDiscovering();
-                startAdvertising();
                 break;
-                */
             case REQUEST:
                 /*
                 Log.d(TAG,"dis_state: NORMAL");
@@ -1180,6 +1255,140 @@ public class MANETManageService extends Service implements
      * @param payload （送信者から送られてきた）データ。
      */
     protected void onReceive(Endpoint endpoint, Payload payload) {}
+
+    /**
+     * 接続確立したDiscovererがAdvertiserからのPayloadを受け取った時。
+     * メッセージの種類を解析し、それに応じた対応を行う。基本的には送り返す。
+     * @param endpoint 送信者。
+     * @param payload （送信者から送られてきた）データ。
+     */
+    protected void onReceiveByDiscoverer(Endpoint endpoint, Payload payload){
+        //メッセージ受信(Payload変換)
+        byte[] messageByte = payload.asBytes(); //Payload = byte型配列でメッセージを受信
+        String messageStr = new String(messageByte); // byte型配列メッセージをString型に変換
+        //例）(int) messageType + ”,” + (int) RREQ ID + “,” + (String) 終点アドレス + “,” + (int) 終点シーケンス番号 + “,” + (String) 送信元アドレス + “,” (int)送信元シーケンス番号
+        String st[] = messageStr.split(","); //messageStrの中身をカンマで区切ってstring配列の各項目に挿入
+        /**
+         * st[0] = (string) messageType
+         * st[1] = (string) RREQ ID
+         * st[2] = (string) 終点アドレス
+         * st[3] = (string) 終点シーケンス番号
+         * …
+         * st[5] = (string) 送信元シーケンス番号
+         **/
+
+        // メッセージ全体のうち1つ目のトークンのString値によってメッセージ内容を判別
+        if(st[0] == null){
+            Log.d(TAG, "onPayloadReceivedByDiscoverer: messageJudge is Null!");
+        }else switch (st[0]){
+            case "1":
+                /**
+                 * RREQの場合
+                 * RREQメッセージに指定されている送信先へのアクティブな経路を自分が持っていて
+                 * （ if(mRouteLists.get(st[4]) != null) ）、
+                 * 自身の有効な送信先（終点）シーケンス番号がRREQメッセージの送信先（終点）シーケンス番号以上
+                 * （ if(mRouteLists.get(st[4]).getSeqNum() >= parseInt(st[3]) ) ）
+                 * ならば、RREQを送ってきた相手に対してRREPを送信する。
+                 * そのRREPメッセージのホップ数や送信先シーケンス番号は、
+                 * そのノードの経路表のエントリーからコピーしてくる。
+                **/
+                // 受け取ったRREQに指定されている終点アドレスへの経路表を自分は持っているか？
+                if(mRouteLists.get(st[4]) != null){
+                    // 自分の経路表の有効な終点シーケンス番号が受け取ったRREQの終点シーケンス番号以上か？
+                    if(mRouteLists.get(st[4]).getSeqNum() >= parseInt(st[3]) ){
+                        //TODO: 受け取ったRREQを基にしたRREPメッセージを送り返す
+
+                    }
+
+                }else{
+                    // RREQを受け取ったけどすでに経路構築されているわけではないetc
+                    // 同一内容（受け取ったpayloadそのまま）で送り返す
+                    // ※ここのendpoint.getId()でエラーが出るなら、mPayloadCallbackByDiscovererから
+                    // endpointIdもらったほうがいい
+                    Nearby.Connections.sendPayload(mGoogleApiClient,endpoint.getId(),payload)
+                            .setResultCallback(
+                            new ResultCallback<Status>() {
+                                @Override
+                                public void onResult(@NonNull Status status) {
+                                    if (!status.isSuccess()) {
+                                        //sendPayloadの送信に失敗したとき
+                                        Log.w(TAG,
+                                                String.format(
+                                                        "sendPayload failed."));
+                                        /** 通知 */
+                                        builder.setContentText("onReceiveByDiscoverer: sendPayload failed.");
+                                        mNM.notify(1, builder.build());
+                                    }else{
+                                        //sendPayloadの送信に成功したとき
+                                        mIsReceiving = true;
+                                        // この後、Advertiserがこちらの送信に反応して切断するまで待機
+
+                                    }
+                                }
+                            });
+                }
+                break;
+            case "2":
+                // 同一内容（受け取ったpayloadそのまま）で送り返す
+                Nearby.Connections.sendPayload(mGoogleApiClient,endpoint.getId(),payload)
+                        .setResultCallback(
+                        new ResultCallback<Status>() {
+                            @Override
+                            public void onResult(@NonNull Status status) {
+                                if (!status.isSuccess()) {
+                                    //sendPayloadの送信に失敗したとき
+                                    Log.w(TAG,
+                                            String.format(
+                                                    "sendPayload failed."));
+                                    /** 通知 */
+                                    builder.setContentText("onReceiveByDiscoverer: sendPayload failed.");
+                                    mNM.notify(1, builder.build());
+                                }else{
+                                    //sendPayloadの送信に成功したとき
+                                    mIsReceiving = true;
+                                    // この後、Advertiserがこちらの送信に反応して切断するまで待機
+                                }
+                            }
+                        });;
+                break;
+            case "3":
+                //TODO: RERRメッセージだと分かった場合
+
+                break;
+            case "4":
+                //TODO: 実通信メッセージだと分かった場合
+                //※保険として確保
+
+                break;
+            case "ping":
+                //TODO: pingメッセージ（デバッグ用）
+
+                break;
+            default:
+                //TODO: fatal exception(全く関係なさそうなメッセージが飛んできた)
+
+        }
+    }
+
+    protected void onReceiveByAdvertiser(Endpoint endpoint, Payload payload) {
+        //自分からメッセージ送信済か？
+        if(mIsReceiving = true){
+
+            //その中身は自分が送ったものと一致するか？
+            //メッセージ受信(Payload変換)
+            byte[] messageByte = payload.asBytes(); //Payload = byte型配列でメッセージを受信
+            String messageStr = new String(messageByte); // byte型配列メッセージをString型に変換
+            //例）(int) messageType + ”,” + (int) RREQ ID + “,” + (String) 終点アドレス + “,” + (int) 終点シーケンス番号 + “,” + (String) 送信元アドレス + “,” (int)送信元シーケンス番号
+            String st[] = messageStr.split(","); //messageStrの中身をカンマで区切ってstring配列の各項目に挿入
+
+            //TODO:最低限、自分が送ったメッセージタイプは記録しておかないと判別が面倒
+            //もしくは送信した内容をそのままString型で保持しておくか
+
+            //TODO: 送ったものと受け取ったものが一致すると判明したら、通信を切断する
+            setAdvState(adv_State.STOP); //Advertiseは次に送るべきものが出てくるまで終了
+            setDisState(dis_State.NORMAL); //Discoverを始める
+        }
+    }
 
     /**
      * 通信の連絡先に自分のプロファイルを照会し、名前を返します。
@@ -1291,12 +1500,12 @@ public class MANETManageService extends Service implements
      */
     protected static class RouteList{
         @NonNull private String endNodeAddress; /* 終点ノードアドレス */
-        @NonNull private String endSequenceNum; /* 終点シーケンス番号 */
+        @NonNull private int endSequenceNum; /* 終点シーケンス番号 */
         @NonNull private String nextHopAddress; /* 次ホップアドレス */
         private int effectiveDate;              /* 有効期限 */
         List<String> precursorList = new ArrayList<String>(); /* 終点ノードアドレスについてのprecursorリスト */
 
-        private RouteList(@NonNull String regist_Address, @NonNull String regist_SeqNum, @NonNull String regist_HopAddress, int regist_Date) {
+        private RouteList(@NonNull String regist_Address, @NonNull int regist_SeqNum, @NonNull String regist_HopAddress, int regist_Date) {
             this.endNodeAddress = regist_Address;
             this.endSequenceNum = regist_SeqNum;
             this.nextHopAddress = regist_HopAddress;
@@ -1309,7 +1518,7 @@ public class MANETManageService extends Service implements
         }
 
         @NonNull
-        public String getSeqNum() {
+        public int getSeqNum() {
             return endSequenceNum;
         }
 
@@ -1339,7 +1548,34 @@ public class MANETManageService extends Service implements
                 return false;
             }
         }
+    }
 
+    private static class ReceivedPayload {
+        @NonNull private Payload payload;
+        private byte[] messageByte;
+        private String messageStr;
+        private String st[];
+        /**
+         * st[0] = (string) messageType
+         * st[1] = (string) RREQ ID
+         * st[2] = (string) 終点アドレス
+         * st[3] = (string) 終点シーケンス番号
+         * …
+         * st[5] = (string) 送信元シーケンス番号
+         **/
+
+        private ReceivedPayload(@NonNull Payload payload) {
+            this.payload = payload;
+        }
+
+        private void getStringTokens(){
+            this.messageByte = this.payload.asBytes(); //Payload = byte型配列でメッセージを受信
+            this.messageStr = new String(messageByte); // byte型配列メッセージをString型に変換
+            //例）(int) messageType + ”,” + (int) RREQ ID + “,” + (String) 終点アドレス + “,” + (int) 終点シーケンス番号 + “,” + (String) 送信元アドレス + “,” (int)送信元シーケンス番号
+            this.st = messageStr.split(","); //messageStrの中身をカンマで区切ってstring配列の各項目に挿入
+        }
+
+        public String getMessageType(){ return st[0]; }
     }
 
     private static String generateRandomName() {
