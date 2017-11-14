@@ -147,7 +147,11 @@ public class MANETManageService extends Service implements
      */
     private final Map<String, RouteList> mRouteLists = new HashMap<>();
 
+    //TODO: 経路表だけでなく端末自身のシーケンス番号を記録する変数が必要ではないか？
+
     private ReceivedPayload receivedPayload;
+
+    private SendingNormalPayload sendingNormalPayload;
 
     /**
      * こちらの端末が、発見された端末にこちらへ接続するよう要求している場合はtrueです。
@@ -577,6 +581,46 @@ public class MANETManageService extends Service implements
                 this, getString(R.string.toast_connected, endpoint.getName()), Toast.LENGTH_SHORT)
                 .show();
         setState(State.CONNECTED);
+
+        //もしもadv_Stateが有効である(STOP以外)
+        if(mAdvState != adv_State.STOP){
+            //送ろうとしているのがRREQならば
+            if("1".equals( sendingNormalPayload.getMessageType() ) ){
+                //RREQを送るAdvertiserの経路表構築を行う
+                //けどさすがに自分への経路表は作らなくていいから（良心）
+                if( !mName.equals( sendingNormalPayload.getSourceAddress() ) ){
+                    mRouteLists.put(sendingNormalPayload.getSourceAddress(),
+                            new RouteList(sendingNormalPayload.getSourceAddress(),
+                                    parseInt( sendingNormalPayload.getSourceSeqNum() ),
+                                    endpoint.getName(),
+                                    3600
+                            )
+                    );
+                }
+            }
+            //adv_Stateが有効 = 何か送りたいPayloadがあるので、それを送る
+            Nearby.Connections.sendPayload( mGoogleApiClient,endpoint.getId(), sendingNormalPayload.getPayload() )
+                    .setResultCallback(
+                            new ResultCallback<Status>() {
+                                @Override
+                                public void onResult(@NonNull Status status) {
+                                    if (!status.isSuccess()) {
+                                        //sendPayloadの送信に失敗したとき
+                                        Log.w(TAG,
+                                                String.format(
+                                                        "sendPayload failed."));
+                                        /** 通知 */
+                                        builder.setContentText("onEndpointConnected: sendPayload failed.");
+                                        mNM.notify(1, builder.build());
+                                    }else{
+                                        //sendPayloadの送信に成功したとき
+                                        mIsReceiving = true;
+                                        // この後、Advertiserがこちらの送信に反応して切断するまで待機
+                                    }
+                                }
+                            }
+                    );
+        }
     }
 
     protected void onEndpointDisconnected(Endpoint endpoint) {
@@ -585,19 +629,30 @@ public class MANETManageService extends Service implements
         mNM.notify(1, builder.build());
 
         //TODO: Discovererが受け取ったメッセージを基に新たなメッセージを作成・送信
+        //TODO: 強調
+
         // 相手からのメッセージを確認（して返送）済みか？
         if(mIsReceiving == true){
             // 自分のノードの役割に応じて条件分岐
             switch(myRole){
                 case RELAY:
                     //中継ノード
-                    //経路表構築
-                    mRouteLists.put( receivedPayload.getST(4),
-                            new RouteList(receivedPayload.getST(2),
-                                    parseInt( receivedPayload.getST(3) ),
-                                    receivedPayload.getST(4),
-                                    3600) );
-                    // RREPを受け取っている場合は経路表のprecursorリストに追加
+
+                    // RREPメッセージを送信する場合に限り
+                    if("2".equals( receivedPayload.getST(0) ) ){
+                        //RREPにおける経路表構築(RREQに関してはacceptConnectionByAdvertiser()にて行う)
+                        //RREPにおける次ホップ = 自分の経路表に保存されている送信元ノードに関する次ホップアドレス
+                        mRouteLists.put( receivedPayload.getST(2),
+                                new RouteList(receivedPayload.getST(2),
+                                        parseInt( receivedPayload.getST(3) ),
+                                        mRouteLists.get( receivedPayload.getST(4) ).getHopAdd(),
+                                        3600) );
+                        // 経路表の送信元ノード（RREQの作成者）へのエントリー内のprecursorリストに前ホップのIPアドレスを、
+                        mRouteLists.get( receivedPayload.getST(4) ).addPrecursor( endpoint.getName() );
+                        // 送信先ノード（RREQの宛先）へのエントリー内のprecursorリストに次ホップのIPアドレスを追加
+                        // 次ホップのIPアドレス = 自分の経路表に保存されている送信元ノードに関する次ホップアドレス
+                        mRouteLists.get( receivedPayload.getST(2) ).addPrecursor( mRouteLists.get( receivedPayload.getST(4) ).getHopAdd() );
+                    }
 
                     // 受け取ったRREQ、RREPを基に転送準備
                         // 新しいメソッド
@@ -1318,6 +1373,15 @@ public class MANETManageService extends Service implements
         // メッセージ受信(Payload変換)
         receivedPayload = new ReceivedPayload(payload);
 
+        //TODO: シークエンス番号を比較してpayloadのほうが古かったらpayloadを破棄する
+
+        /**
+         * 宛先ノードに関するシーケンス番号が最新であることを確認するため，
+         * ノードは現在のシーケンス番号の数値を，受信したメッセージのシーケンス番号と比較する.
+         * 受信したメッセージのシーケンス番号から現在のシーケンス番号を引いた値が0未満である場合，
+         * 受信したシーケンス番号は古い情報であるため，メッセージの宛先ノードに関する情報は破棄される.
+         */
+
         // メッセージ全体のうち1つ目のトークンのString値によってメッセージ内容を判別
         if(receivedPayload.getST(0) == null){
             Log.d(TAG, "onPayloadReceivedByDiscoverer: messageJudge is Null!");
@@ -1335,9 +1399,9 @@ public class MANETManageService extends Service implements
                  * そのノードの経路表のエントリーからコピーしてくる。
                  **/
                 // RREQを受け取った&&指定されている終点アドレスへの経路表を自分は持っているか？
-                if(receivedPayload.getST(0) == "1" && mRouteLists.get(receivedPayload.getST(0)) != null){
+                if(receivedPayload.getST(0) == "1" && mRouteLists.get(receivedPayload.getST(2)) != null){
                     // 自分の経路表の有効な終点シーケンス番号が受け取ったRREQの終点シーケンス番号以上か？
-                    if(mRouteLists.get(receivedPayload.getST(4)).getSeqNum() >= parseInt(receivedPayload.getST(3)) ){
+                    if(mRouteLists.get(receivedPayload.getST(2)).getSeqNum() >= parseInt(receivedPayload.getST(3)) ){
                         //TODO: 受け取ったRREQを基にしたRREPメッセージを送り返す
 
                     }
@@ -1399,11 +1463,17 @@ public class MANETManageService extends Service implements
             String st[] = messageStr.split(","); //messageStrの中身をカンマで区切ってstring配列の各項目に挿入
 
             //TODO:最低限、自分が送ったメッセージタイプは記録しておかないと判別が面倒
-            //もしくは送信した内容をそのままString型で保持しておくか
+            //もしくは送信する/した内容をそのままString型で保持しておくか
 
             //TODO: 送ったものと受け取ったものが一致すると判明したら、通信を切断する
             setAdvState(adv_State.STOP); //Advertiseは次に送るべきものが出てくるまで終了
             setDisState(dis_State.NORMAL); //Discoverを始める
+
+            //TODO: RREQ送信用のシーケンス番号をインクリメント
+
+            //TODO: RREPのprecursorリスト
+            // 経路表のRREP送信先ノードへのエントリー内のprecursorリストに次ホップのアドレス
+            // （Discoverer／RREP受け取った側のアドレス）を追加する（RERRメッセージ送信用に利用する）
         }
     }
 
@@ -1529,14 +1599,14 @@ public class MANETManageService extends Service implements
      */
     protected static class RouteList{
         @NonNull private String endNodeAddress; /* 終点ノードアドレス */
-        @NonNull private int endSequenceNum; /* 終点シーケンス番号 */
+        @NonNull private int endSeqNum; /* 終点シーケンス番号 */
         @NonNull private String nextHopAddress; /* 次ホップアドレス */
         private int effectiveDate;              /* 有効期限 */
         List<String> precursorList = new ArrayList<String>(); /* 終点ノードアドレスについてのprecursorリスト */
 
         private RouteList(@NonNull String regist_Address, @NonNull int regist_SeqNum, @NonNull String regist_HopAddress, int regist_Date) {
             this.endNodeAddress = regist_Address;
-            this.endSequenceNum = regist_SeqNum;
+            this.endSeqNum = regist_SeqNum;
             this.nextHopAddress = regist_HopAddress;
             this.effectiveDate = regist_Date;
         }
@@ -1549,9 +1619,9 @@ public class MANETManageService extends Service implements
         }
 
         @NonNull
-        public int getSeqNum() { return endSequenceNum; }
+        public int getSeqNum() { return endSeqNum; }
 
-        public void setSeqNum(int num) { this.endSequenceNum = num; }
+        public void setSeqNum(int num) { this.endSeqNum = num; }
 
         @NonNull
         public String getHopAdd() {
@@ -1585,12 +1655,12 @@ public class MANETManageService extends Service implements
         @NonNull private Payload payload;
         private String st[];
         /**
-         * RREQの場合
+         * RREQ/RREPの場合
          * st[0] = (string) messageType
          * st[1] = (string) RREQ ID
-         * st[2] = (string) 終点アドレス
+         * st[2] = (string) 終点アドレス（RREQの宛先）
          * st[3] = (string) 終点シーケンス番号
-         * st[4] = (string) 送信元アドレス
+         * st[4] = (string) 送信元アドレス（RREQの作成者）
          * st[5] = (string) 送信元シーケンス番号
          **/
 
@@ -1604,6 +1674,55 @@ public class MANETManageService extends Service implements
 
         /* st[num]を返す */
         private String getST(int num){return st[num];}
+    }
+
+    protected static class SendingNormalPayload {
+        private Payload payload;
+        private String messageType;
+        private String endNodeAddress;
+        private String endSeqNum;
+        private String sourceAddress;
+        private String sourceSeqNum;
+        private String RREQ_ID = "1";
+
+        /**
+         * RREQ/RREPの場合
+         * st[0] = (string) messageType
+         * st[1] = (string) RREQ ID
+         * st[2] = (string) 終点アドレス（RREQの宛先）
+         * st[3] = (string) 終点シーケンス番号
+         * st[4] = (string) 送信元アドレス（RREQの作成者）
+         * st[5] = (string) 送信元シーケンス番号
+         **/
+
+        /* 最初にpayloadを処理しておく */
+        private SendingNormalPayload(String messageType, String endNodeAddress, String endSeqNum, String sourceAddress, String sourceSeqNum) {
+            this.messageType = messageType;
+            this.endNodeAddress = endNodeAddress;
+            this.endSeqNum = endSeqNum;
+            this.sourceAddress = sourceAddress;
+            this.sourceSeqNum = sourceSeqNum;
+
+            // String型でメッセージを作成
+            String message_str = this.messageType + "," + RREQ_ID + ","
+                    + this.endNodeAddress + "," + this.endSeqNum + "," + this.sourceAddress
+                    + "," + this.sourceSeqNum;
+            // String型をbyte型配列に変換
+            byte[] message_byte = message_str.getBytes();
+            // byte型配列をPayloadとして登録
+            this.payload = Payload.fromBytes(message_byte);
+        }
+
+        /* payloadを返す */
+        private Payload getPayload() {return this.payload;}
+
+        /* messageTypeを返す */
+        private String getMessageType() {return this.messageType;}
+
+        /* 送信元アドレスを返す */
+        private String getSourceAddress(){return this.sourceAddress;}
+        /* 送信元シーケンス番号を返す */
+        private String getSourceSeqNum(){return this.sourceSeqNum;}
     }
 
     private static String generateRandomName() {
