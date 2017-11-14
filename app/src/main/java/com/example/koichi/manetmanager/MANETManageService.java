@@ -439,9 +439,9 @@ public class MANETManageService extends Service implements
         mNM.notify(1, builder.build());
 
         //super.onConnected(bundle);
-        setState(State.SEARCHING);
-        //setDisState(dis_State.NORMAL);
-        //setAdvState(adv_State.STOP);
+        //setState(State.SEARCHING);
+        setDisState(dis_State.NORMAL);
+        setAdvState(adv_State.STOP);
     }
 
     /** 切断された！ 全部停止！ */
@@ -455,7 +455,8 @@ public class MANETManageService extends Service implements
         //builder.setContentTitle("MANET Manage state");
         mNM.notify(2, builder.build());
 
-        setState(State.UNKNOWN);
+        //setState(State.UNKNOWN);
+        setDisState(dis_State.NORMAL);
     }
 
     /** DiscoverがAdvertiserを発見した時 **/
@@ -580,7 +581,8 @@ public class MANETManageService extends Service implements
         Toast.makeText(
                 this, getString(R.string.toast_connected, endpoint.getName()), Toast.LENGTH_SHORT)
                 .show();
-        setState(State.CONNECTED);
+        //setState(State.CONNECTED);
+        setDisState(dis_State.CONNECTED);
 
         //もしもadv_Stateが有効である(STOP以外)
         if(mAdvState != adv_State.STOP){
@@ -591,7 +593,7 @@ public class MANETManageService extends Service implements
                 if( !mName.equals( sendingNormalPayload.getSourceAddress() ) ){
                     mRouteLists.put(sendingNormalPayload.getSourceAddress(),
                             new RouteList(sendingNormalPayload.getSourceAddress(),
-                                    parseInt( sendingNormalPayload.getSourceSeqNum() ),
+                                    parseInt( sendingNormalPayload.getSourceSeqNum() ) + 1,
                                     endpoint.getName(),
                                     3600
                             )
@@ -640,11 +642,11 @@ public class MANETManageService extends Service implements
 
                     // RREPメッセージを送信する場合に限り
                     if("2".equals( receivedPayload.getST(0) ) ){
-                        //RREPにおける経路表構築(RREQに関してはacceptConnectionByAdvertiser()にて行う)
-                        //RREPにおける次ホップ = 自分の経路表に保存されている送信元ノードに関する次ホップアドレス
+                        // RREPにおける経路表構築(RREQに関してはacceptConnectionByAdvertiser()にて行う)
+                        // RREPにおける次ホップ = 自分の経路表に保存されている送信元ノードに関する次ホップアドレス
                         mRouteLists.put( receivedPayload.getST(2),
                                 new RouteList(receivedPayload.getST(2),
-                                        parseInt( receivedPayload.getST(3) ),
+                                        parseInt( receivedPayload.getST(3) ) + 1,
                                         mRouteLists.get( receivedPayload.getST(4) ).getHopAdd(),
                                         3600) );
                         // 経路表の送信元ノード（RREQの作成者）へのエントリー内のprecursorリストに前ホップのIPアドレスを、
@@ -652,13 +654,30 @@ public class MANETManageService extends Service implements
                         // 送信先ノード（RREQの宛先）へのエントリー内のprecursorリストに次ホップのIPアドレスを追加
                         // 次ホップのIPアドレス = 自分の経路表に保存されている送信元ノードに関する次ホップアドレス
                         mRouteLists.get( receivedPayload.getST(2) ).addPrecursor( mRouteLists.get( receivedPayload.getST(4) ).getHopAdd() );
+
+                        // 受け取ったRREPを基にPayloadを作成
+                        sendingNormalPayload
+                                = new SendingNormalPayload( receivedPayload.getST(0),
+                                receivedPayload.getST(2),
+                                receivedPayload.getST(3),
+                                receivedPayload.getST(4),
+                                String.valueOf( mRouteLists.get( receivedPayload.getST(4) ).getSeqNum() )
+                        );
+                        // 経路探索-返信状態へ移行
+                        setAdvState(adv_State.REPLY);
+                    }else{
+                        // RREQメッセージを送信する場合
+                        // 受け取ったRREPを基にPayloadを作成
+                        sendingNormalPayload
+                                = new SendingNormalPayload( receivedPayload.getST(0),
+                                receivedPayload.getST(2),
+                                String.valueOf( mRouteLists.get( receivedPayload.getST(2) ).getSeqNum() + 1 ),
+                                receivedPayload.getST(4),
+                                receivedPayload.getST(5)
+                        );
+                        // 経路探索-要求状態へ移行
+                        setAdvState(adv_State.REQUEST);
                     }
-
-                    // 受け取ったRREQ、RREPを基に転送準備
-                        // 新しいメソッド
-
-                    // 経路探索-要求状態か経路探索-返信状態へ移行
-                    // 通常状態としての動作も冒頭に戻り、Discoverを再度スタート
                     break;
                 case DESTIN:
                     //デスティネーションノード、RREQしか受け取らない（はず）
@@ -673,14 +692,26 @@ public class MANETManageService extends Service implements
                     // 受け取ったRREQを基に転送準備
                     // 送信先アドレスと送信元アドレスには、RREQに書かれていたものをコピーする
 
+                    //TODO:Discoverer自身のシーケンス番号
+                    // 送るRREPメッセージの送信先シーケンス番号 = Discovererのシーケンス番号
+                    // mRouteLists.get( receivedPayload.getST(2) ).getSeqNum()を使えと。
+                    sendingNormalPayload
+                            = new SendingNormalPayload( receivedPayload.getST(0),
+                            receivedPayload.getST(2),
+                            String.valueOf( mRouteLists.get( receivedPayload.getST(2) ).getSeqNum() ),
+                            receivedPayload.getST(4),
+                            String.valueOf( mRouteLists.get( receivedPayload.getST(2) ).getSeqNum() )
+                    );
                     // 経路探索-返信状態へ移行する。
-                    // 通常状態としての動作も冒頭に戻り、Discoverを再度スタートする。
+                    setAdvState(adv_State.REPLY);
                     break;
                 case SOURCE:
+                    Log.d(TAG,"sourceNode: Received RREP");
                     // ソースノード、RREQメッセージは受け取らない（はず）
 
                     // おそらくRREPメッセージを受け取っているので、
                     // 経路構築状態（実データ送受信）へ移行してデータ通信を開始する。
+                    setAdvState(adv_State.CONSTRUCTED);
                     break;
                 default:
                     // ここに来るのはエラーかAdvertiser？
@@ -691,17 +722,16 @@ public class MANETManageService extends Service implements
         Toast.makeText(
                 this, getString(R.string.toast_disconnected, endpoint.getName()), Toast.LENGTH_SHORT)
                 .show();
-        setState(State.SEARCHING);
+        //setState(State.SEARCHING);
+        // 通常状態としての動作も冒頭に戻り、Discoverを再度スタート
+        setDisState(dis_State.NORMAL);
     }
 
     /** Nearby ConnectionsのGoogleAPIClientに接続できなかったとき。あーあ。 */
     @Override
     public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
         Log.d(TAG,"onConnectionFailed(@NonNull ConnectionResult connectionResult)");
-        Log.w(TAG,
-                String.format(
-                        "onConnectionFailed"
-                ));
+        Log.w(TAG, String.format("onConnectionFailed"));
         /** 通知 */
         builder.setContentText("onConnectionFailed(@NonNull ConnectionResult connectionResult)");
         mNM.notify(1, builder.build());
@@ -1022,6 +1052,11 @@ public class MANETManageService extends Service implements
                         });
     }
 
+    protected void stopWaitByDiscovering() {
+        mIsDiscovering = false;
+        Nearby.Connections.stopDiscovery(mGoogleApiClient);
+    }
+
     protected void disconnect(Endpoint endpoint) {
         Nearby.Connections.disconnectFromEndpoint(mGoogleApiClient, endpoint.getId());
         mEstablishedConnections.remove(endpoint.getId());
@@ -1152,9 +1187,9 @@ public class MANETManageService extends Service implements
                 builder.setContentText("state: SEARCHING");
                 mNM.notify(2, builder.build());
 
-                disconnectFromAllEndpoints();
-                startDiscovering();
-                startAdvertising();
+                //disconnectFromAllEndpoints();
+                //startDiscovering();
+                //startAdvertising();
                 break;
             case CONNECTED:
                 Log.d(TAG,"state: CONNECTED");
@@ -1238,6 +1273,16 @@ public class MANETManageService extends Service implements
                     setDisState(dis_State.STOP);
                 }
                 break;
+            case CONNECTED:
+                Log.d(TAG,"state: CONNECTED");
+
+                /** 通知 */
+                builder.setContentText("state: CONNECTED");
+                mNM.notify(2, builder.build());
+
+                stopWaitByDiscovering();
+                stopAdvertising();
+                break;
             default:
                 // no-op
                 break;
@@ -1282,38 +1327,32 @@ public class MANETManageService extends Service implements
         // Nearby Connectionsを新しい状態に更新する。
         switch (newState) {
             case STOP:
-                Log.d(TAG,"dis_State: STOP");
+                Log.d(TAG,"Adv_State: STOP");
 
                 //通知
-                builder.setContentText("dis_State: STOP");
+                builder.setContentText("Adv_State: STOP");
                 mNM.notify(2, builder.build());
 
                 disconnectFromAllEndpoints();
                 break;
             case REQUEST:
-                /*
-                Log.d(TAG,"dis_state: NORMAL");
+                Log.d(TAG,"Adv_state: NORMAL");
 
                 // 通知
-                builder.setContentText("dis_state: NORMAL");
+                builder.setContentText("Adv_state: NORMAL");
                 mNM.notify(2, builder.build());
 
-                stopDiscovering();
-                stopAdvertising();
+                startAdvertising();
                 break;
-                */
             case REPLY:
-                /*
                 Log.d(TAG,"dis_state: NORMAL");
 
                 // 通知
                 builder.setContentText("dis_state: NORMAL");
                 mNM.notify(2, builder.build());
 
-                stopDiscovering();
-                stopAdvertising();
+                startAdvertising();
                 break;
-                */
             case BROKEN:
                 /*
                 Log.d(TAG,"dis_state: NORMAL");
@@ -1518,11 +1557,13 @@ public class MANETManageService extends Service implements
 
     /** Discoverモードに関して、端末が変化し得る状態の一覧。
      *  STOP:   停止状態（コミュニティトークン作成待ち）
-     *  NORMAL: 通常状態（各種メッセージ・実データ受信）
+     *  NORMAL: 通常状態（各種メッセージ受信のための通信確立待ち）
+     *  CONNECTED: 接続状態（各種メッセージ受信待ち）
      */
     public enum dis_State{
         STOP,
-        NORMAL
+        NORMAL,
+        CONNECTED
     }
 
     /** Advertiserモードに関して、端末が変化し得る状態の一覧。
