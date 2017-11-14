@@ -107,6 +107,11 @@ public class MANETManageService extends Service implements
     private adv_State mAdvState = adv_State.STOP;
 
     /**
+     * Discoverモードにおける自端末のノードとしての役割。
+     */
+    private isMyRole myRole = isMyRole.UNKNOWN;
+
+    /**
      * Nearby Connectionsで利用する connection strategy。 今回は、 Bluetooth Classicと
      * WiFi ホットスポットの組み合わせであるP2P_STARを採用した。
      */
@@ -141,6 +146,8 @@ public class MANETManageService extends Service implements
      * 端末が知っている宛先の数だけ、このMapの要素数とRouteListが存在する。はず。
      */
     private final Map<String, RouteList> mRouteLists = new HashMap<>();
+
+    private ReceivedPayload receivedPayload;
 
     /**
      * こちらの端末が、発見された端末にこちらへ接続するよう要求している場合はtrueです。
@@ -480,7 +487,7 @@ public class MANETManageService extends Service implements
         {
             //自分がDiscovererのとき
             //自端末のMACアドレスをmNameに入れて利用しているはずなので、それを流用する
-            if(mName == mDestinationAddress){
+            if(mName.equals(mDestinationAddress)){
                 //TODO:自分がDiscovererかつデスティノードのとき
                 //TODO:デスティネーションノードとアクセスポイントのアソシエーションがある／ない
                 /**
@@ -497,6 +504,7 @@ public class MANETManageService extends Service implements
                         (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
                 @Nullable NetworkInfo networkInfo = connectivityManager.getActiveNetworkInfo();
                 if (networkInfo != null && networkInfo.getType() == ConnectivityManager.TYPE_WIFI){
+                    myRole = isMyRole.DESTIN;
                     //Wi-Fiでネットワークがアクティブになってる
                     acceptConnectionByDiscoverer(endpoint);
                 }else{
@@ -505,9 +513,10 @@ public class MANETManageService extends Service implements
                 }
             }else{
                 ArrayList<Accounts> accountList = common.getAccountGroup();
-                if( mName == accountList.get(common.getListIndex()).getSourceAddress() ){
+                if( mName.equals( accountList.get(common.getListIndex()).getSourceAddress() ) ){
                     //自分がDiscovererかつソースノードのとき
                     // すぐに接続を受け入れる。
+                    myRole = isMyRole.SOURCE;
                     acceptConnectionByDiscoverer(endpoint);
                 }else {
                     //自分がDiscovererかつ中継ノードのとき
@@ -522,6 +531,7 @@ public class MANETManageService extends Service implements
                         return;
                     }else {
                         //メッセージ残量に問題が見られない
+                        myRole = isMyRole.RELAY;
                         //accept後、メッセージを受け取って解析へ
                         acceptConnectionByDiscoverer(endpoint);
                     }
@@ -575,7 +585,51 @@ public class MANETManageService extends Service implements
         mNM.notify(1, builder.build());
 
         //TODO: Discovererが受け取ったメッセージを基に新たなメッセージを作成・送信
+        // 相手からのメッセージを確認（して返送）済みか？
         if(mIsReceiving == true){
+            // 自分のノードの役割に応じて条件分岐
+            switch(myRole){
+                case RELAY:
+                    //中継ノード
+                    //経路表構築
+                    mRouteLists.put( receivedPayload.getST(4),
+                            new RouteList(receivedPayload.getST(2),
+                                    parseInt( receivedPayload.getST(3) ),
+                                    receivedPayload.getST(4),
+                                    3600) );
+                    // RREPを受け取っている場合は経路表のprecursorリストに追加
+
+                    // 受け取ったRREQ、RREPを基に転送準備
+                        // 新しいメソッド
+
+                    // 経路探索-要求状態か経路探索-返信状態へ移行
+                    // 通常状態としての動作も冒頭に戻り、Discoverを再度スタート
+                    break;
+                case DESTIN:
+                    //デスティネーションノード、RREQしか受け取らない（はず）
+
+                    //If(Discovererの（経路表の？）シーケンス番号 ＜ RREQメッセージの送信先シーケンス番号)ならば
+                    if(mRouteLists.get( receivedPayload.getST(2) ).getSeqNum() < parseInt( receivedPayload.getST(3) ) ){
+                        //Discovererのシーケンス番号 = 送信先シーケンス番号
+                        mRouteLists.get( receivedPayload.getST(2) ).setSeqNum( parseInt( receivedPayload.getST(3) ) );
+                        //送るRREPメッセージの送信先シーケンス番号 = Discovererのシーケンス番号
+                            //mRouteLists.get( receivedPayload.getST(2) ).getSeqNum()を使えと。
+                    }
+                    // 受け取ったRREQを基に転送準備
+                    // 送信先アドレスと送信元アドレスには、RREQに書かれていたものをコピーする
+
+                    // 経路探索-返信状態へ移行する。
+                    // 通常状態としての動作も冒頭に戻り、Discoverを再度スタートする。
+                    break;
+                case SOURCE:
+                    // ソースノード、RREQメッセージは受け取らない（はず）
+
+                    // おそらくRREPメッセージを受け取っているので、
+                    // 経路構築状態（実データ送受信）へ移行してデータ通信を開始する。
+                    break;
+                default:
+                    // ここに来るのはエラーかAdvertiser？
+            }
 
         }
 
@@ -699,7 +753,6 @@ public class MANETManageService extends Service implements
         Log.d(TAG,"onAdvertisingFailed");
     }
 
-    //TODO: PayloadCallbackを適用する
     /** Discovererが接続要求を受け入れる。（Discover用のPayloadCallbackを使用） */
     protected void acceptConnectionByDiscoverer(final Endpoint endpoint) {
         Nearby.Connections.acceptConnection(mGoogleApiClient, endpoint.getId(), mPayloadCallbackByDiscoverer)
@@ -719,7 +772,6 @@ public class MANETManageService extends Service implements
                         });
     }
 
-    //TODO: PayloadCallbackを適用する
     /** Advertiserが接続要求を受け入れる。（Advertiser用のPayloadCallbackを使用） */
     protected void acceptConnectionByAdvertiser(final Endpoint endpoint) {
         Nearby.Connections.acceptConnection(mGoogleApiClient, endpoint.getId(), mPayloadCallbackByAdvertiser)
@@ -964,7 +1016,6 @@ public class MANETManageService extends Service implements
                         new ResultCallback<Status>() {
                             @Override
                             public void onResult(@NonNull Status status) {
-                                //TODO: 「接続確立した際、自端末がAdvertise／Discoverとして接続確立した」ことを示すboolean変数
                                 //あくまでもNearby.Connections.requestConnection自体の実行に成功したか否か、らしい
                                 if (!status.isSuccess()) {
                                     Log.w(TAG,
@@ -1080,6 +1131,7 @@ public class MANETManageService extends Service implements
         Log.d(TAG,"State set to " + state);
         dis_State oldState = mDisState;
         mDisState = state;
+        myRole = isMyRole.UNKNOWN;
         onDisStateChanged(oldState, state);
     }
 
@@ -1263,25 +1315,15 @@ public class MANETManageService extends Service implements
      * @param payload （送信者から送られてきた）データ。
      */
     protected void onReceiveByDiscoverer(Endpoint endpoint, Payload payload){
-        //メッセージ受信(Payload変換)
-        byte[] messageByte = payload.asBytes(); //Payload = byte型配列でメッセージを受信
-        String messageStr = new String(messageByte); // byte型配列メッセージをString型に変換
-        //例）(int) messageType + ”,” + (int) RREQ ID + “,” + (String) 終点アドレス + “,” + (int) 終点シーケンス番号 + “,” + (String) 送信元アドレス + “,” (int)送信元シーケンス番号
-        String st[] = messageStr.split(","); //messageStrの中身をカンマで区切ってstring配列の各項目に挿入
-        /**
-         * st[0] = (string) messageType
-         * st[1] = (string) RREQ ID
-         * st[2] = (string) 終点アドレス
-         * st[3] = (string) 終点シーケンス番号
-         * …
-         * st[5] = (string) 送信元シーケンス番号
-         **/
+        // メッセージ受信(Payload変換)
+        receivedPayload = new ReceivedPayload(payload);
 
         // メッセージ全体のうち1つ目のトークンのString値によってメッセージ内容を判別
-        if(st[0] == null){
+        if(receivedPayload.getST(0) == null){
             Log.d(TAG, "onPayloadReceivedByDiscoverer: messageJudge is Null!");
-        }else switch (st[0]){
+        }else switch (receivedPayload.getST(0)){
             case "1":
+            case "2":
                 /**
                  * RREQの場合
                  * RREQメッセージに指定されている送信先へのアクティブな経路を自分が持っていて
@@ -1291,65 +1333,40 @@ public class MANETManageService extends Service implements
                  * ならば、RREQを送ってきた相手に対してRREPを送信する。
                  * そのRREPメッセージのホップ数や送信先シーケンス番号は、
                  * そのノードの経路表のエントリーからコピーしてくる。
-                **/
-                // 受け取ったRREQに指定されている終点アドレスへの経路表を自分は持っているか？
-                if(mRouteLists.get(st[4]) != null){
+                 **/
+                // RREQを受け取った&&指定されている終点アドレスへの経路表を自分は持っているか？
+                if(receivedPayload.getST(0) == "1" && mRouteLists.get(receivedPayload.getST(0)) != null){
                     // 自分の経路表の有効な終点シーケンス番号が受け取ったRREQの終点シーケンス番号以上か？
-                    if(mRouteLists.get(st[4]).getSeqNum() >= parseInt(st[3]) ){
+                    if(mRouteLists.get(receivedPayload.getST(4)).getSeqNum() >= parseInt(receivedPayload.getST(3)) ){
                         //TODO: 受け取ったRREQを基にしたRREPメッセージを送り返す
 
                     }
-
                 }else{
-                    // RREQを受け取ったけどすでに経路構築されているわけではないetc
-                    // 同一内容（受け取ったpayloadそのまま）で送り返す
+                    // RREPを受け取った、RREQを受け取ったけどすでに経路構築されているわけではない、etc
+                    // →同一内容（受け取ったpayloadそのまま）で送り返す
                     // ※ここのendpoint.getId()でエラーが出るなら、mPayloadCallbackByDiscovererから
                     // endpointIdもらったほうがいい
                     Nearby.Connections.sendPayload(mGoogleApiClient,endpoint.getId(),payload)
                             .setResultCallback(
-                            new ResultCallback<Status>() {
-                                @Override
-                                public void onResult(@NonNull Status status) {
-                                    if (!status.isSuccess()) {
-                                        //sendPayloadの送信に失敗したとき
-                                        Log.w(TAG,
-                                                String.format(
-                                                        "sendPayload failed."));
-                                        /** 通知 */
-                                        builder.setContentText("onReceiveByDiscoverer: sendPayload failed.");
-                                        mNM.notify(1, builder.build());
-                                    }else{
-                                        //sendPayloadの送信に成功したとき
-                                        mIsReceiving = true;
-                                        // この後、Advertiserがこちらの送信に反応して切断するまで待機
-
-                                    }
-                                }
-                            });
+                                    new ResultCallback<Status>() {
+                                        @Override
+                                        public void onResult(@NonNull Status status) {
+                                            if (!status.isSuccess()) {
+                                                //sendPayloadの送信に失敗したとき
+                                                Log.w(TAG,
+                                                        String.format(
+                                                                "sendPayload failed."));
+                                                /** 通知 */
+                                                builder.setContentText("onReceiveByDiscoverer: sendPayload failed.");
+                                                mNM.notify(1, builder.build());
+                                            }else{
+                                                //sendPayloadの送信に成功したとき
+                                                mIsReceiving = true;
+                                                // この後、Advertiserがこちらの送信に反応して切断するまで待機
+                                            }
+                                        }
+                                    });
                 }
-                break;
-            case "2":
-                // 同一内容（受け取ったpayloadそのまま）で送り返す
-                Nearby.Connections.sendPayload(mGoogleApiClient,endpoint.getId(),payload)
-                        .setResultCallback(
-                        new ResultCallback<Status>() {
-                            @Override
-                            public void onResult(@NonNull Status status) {
-                                if (!status.isSuccess()) {
-                                    //sendPayloadの送信に失敗したとき
-                                    Log.w(TAG,
-                                            String.format(
-                                                    "sendPayload failed."));
-                                    /** 通知 */
-                                    builder.setContentText("onReceiveByDiscoverer: sendPayload failed.");
-                                    mNM.notify(1, builder.build());
-                                }else{
-                                    //sendPayloadの送信に成功したとき
-                                    mIsReceiving = true;
-                                    // この後、Advertiserがこちらの送信に反応して切断するまで待機
-                                }
-                            }
-                        });;
                 break;
             case "3":
                 //TODO: RERRメッセージだと分かった場合
@@ -1453,6 +1470,18 @@ public class MANETManageService extends Service implements
         CONSTRUCTED
     }
 
+    /** Discoverモードにおいて、自分がどの役割のノードかを記録する状態変数。
+     * SOURCE: ソースノード
+     * RELAY : 中継ノード
+     * DESTIN: デスティネーションノード
+     */
+    public enum isMyRole{
+        UNKNOWN,
+        SOURCE,
+        RELAY,
+        DESTIN
+    }
+
     /** 通話できる（データの送受信ができる）デバイスを表します。 */
     protected static class Endpoint {
         @NonNull private final String id;
@@ -1511,6 +1540,8 @@ public class MANETManageService extends Service implements
             this.nextHopAddress = regist_HopAddress;
             this.effectiveDate = regist_Date;
         }
+        //TODO: 有効期限のフォーマット、用途を明確にする
+        //とりあえず今のところ秒単位で経路表に登録している
 
         @NonNull
         public String getEndNodeAdd() {
@@ -1518,9 +1549,9 @@ public class MANETManageService extends Service implements
         }
 
         @NonNull
-        public int getSeqNum() {
-            return endSequenceNum;
-        }
+        public int getSeqNum() { return endSequenceNum; }
+
+        public void setSeqNum(int num) { this.endSequenceNum = num; }
 
         @NonNull
         public String getHopAdd() {
@@ -1550,32 +1581,29 @@ public class MANETManageService extends Service implements
         }
     }
 
-    private static class ReceivedPayload {
+    protected static class ReceivedPayload {
         @NonNull private Payload payload;
-        private byte[] messageByte;
-        private String messageStr;
         private String st[];
         /**
+         * RREQの場合
          * st[0] = (string) messageType
          * st[1] = (string) RREQ ID
          * st[2] = (string) 終点アドレス
          * st[3] = (string) 終点シーケンス番号
-         * …
+         * st[4] = (string) 送信元アドレス
          * st[5] = (string) 送信元シーケンス番号
          **/
 
+        /* 最初にpayloadを処理しておく */
         private ReceivedPayload(@NonNull Payload payload) {
             this.payload = payload;
+            // Payloadをbyte型配列へ変換→それを1つのString型に変換
+            // →それをカンマで区切ってstring配列の各項目に挿入
+            this.st = new String( this.payload.asBytes() ).split(",");
         }
 
-        private void getStringTokens(){
-            this.messageByte = this.payload.asBytes(); //Payload = byte型配列でメッセージを受信
-            this.messageStr = new String(messageByte); // byte型配列メッセージをString型に変換
-            //例）(int) messageType + ”,” + (int) RREQ ID + “,” + (String) 終点アドレス + “,” + (int) 終点シーケンス番号 + “,” + (String) 送信元アドレス + “,” (int)送信元シーケンス番号
-            this.st = messageStr.split(","); //messageStrの中身をカンマで区切ってstring配列の各項目に挿入
-        }
-
-        public String getMessageType(){ return st[0]; }
+        /* st[num]を返す */
+        private String getST(int num){return st[num];}
     }
 
     private static String generateRandomName() {
