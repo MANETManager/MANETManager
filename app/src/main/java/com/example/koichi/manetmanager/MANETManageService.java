@@ -373,7 +373,7 @@ public class MANETManageService extends Service implements
         }
 
         /* 通知押下時に、MainActivityのonStartCommandを呼び出すためのintent */
-        Intent notificationIntent = new Intent(this, MainActivity.class);
+        Intent notificationIntent = new Intent(this, MANETManageService.class).putExtra("RREQ", "true");
         PendingIntent pendingIntent = PendingIntent.getService(this, 0, notificationIntent, 0);
 
         /** サービスを長持ちさせるために通知を作成する */
@@ -408,6 +408,11 @@ public class MANETManageService extends Service implements
         /** 通知 */
         builder.setContentText("onStartCommand");
         mNM.notify(1, builder.build());
+
+        if("true".equals( intent.getStringExtra("RREQ") ) )
+        {
+            createNewMessage();
+        }
 
         /** このreturn値によってサービスが停止しても再起動が行われる
          * （終了前のintentが保持されていてonStartCommandに再度渡される） */
@@ -1265,11 +1270,16 @@ public class MANETManageService extends Service implements
                 mNM.notify(2, builder.build());
 
                 //コミュニティトークンを持っているか確認
-                if(common.getAccountGroup().get(common.getListIndex()).getTokenId() != null) {
-                    //あるならDiscover開始してAdvertiseを待つ
-                    startWaitByDiscovering();
+                Log.d(TAG,"TokenId:" + common.getAccountGroup().get(common.getListIndex()).getTokenId() );
+
+                if(common.getAccountGroup().get(common.getListIndex()).getTokenId() != null){
+                    if(!common.getAccountGroup().get(common.getListIndex()).getTokenId().isEmpty()) {
+                        //あるならDiscover開始してAdvertiseを待つ
+                        startWaitByDiscovering();
+                    }
                 }else{
                     //ないならSTOPに戻す
+                    Log.d(TAG,"TokenId = null" );
                     setDisState(dis_State.STOP);
                 }
                 break;
@@ -1492,6 +1502,7 @@ public class MANETManageService extends Service implements
 
     protected void onReceiveByAdvertiser(Endpoint endpoint, Payload payload) {
         //自分からメッセージ送信済か？
+        Log.d(TAG, "onReceiveByAdvertiser");
         if(mIsReceiving = true){
 
             //その中身は自分が送ったものと一致するか？
@@ -1773,6 +1784,31 @@ public class MANETManageService extends Service implements
             name += random.nextInt(10);
         }
         return name;
+    }
+
+    public void createNewMessage(){
+        // RREQメッセージを新規作成して送信する
+        /**
+         * RREQ/RREPの場合
+         * st[0] = (string) messageType
+         * st[1] = (string) RREQ ID
+         * st[2] = (string) 終点アドレス（RREQの宛先）
+         * st[3] = (string) 終点シーケンス番号
+         * st[4] = (string) 送信元アドレス（RREQの作成者）
+         * st[5] = (string) 送信元シーケンス番号
+         **/
+
+        //TODO: 終点シーケンス番号に経路表の番号があれば代入する
+        //送信元シーケンス番号に端末のシーケンス番号を代入する
+        sendingNormalPayload
+                = new SendingNormalPayload( "1",
+                mDestinationAddress,
+                "0",
+                mName,
+                "1"
+        );
+        // 経路探索-要求状態へ移行
+        setAdvState(adv_State.REQUEST);
     }
 
     //TODO: 自端末のMBODを減少させるメソッドが要る？

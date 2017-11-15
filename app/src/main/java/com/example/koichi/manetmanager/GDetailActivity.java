@@ -380,6 +380,7 @@ public class GDetailActivity extends AppCompatActivity {
                                 btn_Create.setVisibility(View.VISIBLE);
                                 viewOfMaketoken(1);
                             }else {
+                                Log.d(TAG, "group_TokenID: " + group_tokenid + "& group_saddress: " + group_saddress);
                                 // コミュニティトークンが存在する
                                 viewOfMaketoken(0);
                                 // サービスは起動する
@@ -579,8 +580,6 @@ public class GDetailActivity extends AppCompatActivity {
      **   startActivity(i);
      **/
 
-    // MANETManageService(NearbyConnections)を起動する。
-        //startService(new Intent(getBaseContext(),MANETManageService.class));
     }
 
     // ネットワーク接続確認
@@ -625,7 +624,8 @@ public class GDetailActivity extends AppCompatActivity {
         ArrayList<Accounts> accountList = gson.fromJson(sharedPreferences.getString("accountJson", null), new TypeToken<ArrayList<Accounts>>(){}.getType());
         Log.d(TAG, accountList.get(0).getGroupId(),null);
 
-
+        // MANETManageService(NearbyConnections)を起動する
+        startService(new Intent(getBaseContext(),MANETManageService.class));
     }
 
 }
