@@ -147,7 +147,7 @@ public class MANETManageService extends Service implements
      */
     private final Map<String, RouteList> mRouteLists = new HashMap<>();
 
-    //TODO: 経路表だけでなく端末自身のシーケンス番号を記録する変数が必要ではないか？
+    //TODO: 経路表だけでなく端末自身のシーケンス番号を記録する変数が必要
 
     private ReceivedPayload receivedPayload;
 
@@ -348,8 +348,7 @@ public class MANETManageService extends Service implements
         common = (Common) this.getApplication();
         ArrayList<Accounts> accountList = common.getAccountGroup();
 
-        //ServiceIdを“MMアプリのパッケージ名（固定値）,” + "CトークンのGroupId" + "," + Cトークンのに設定
-        //TODO: "CトークンのTokenID"に変える必要はあるか？
+        //ServiceIdを“MMアプリのパッケージ名（固定値）,” + "CトークンのGroupId" + "," + CトークンのTokenIdに設定
         SERVICE_ID = "com.example.koichi.manetmanager,"+ accountList.get(common.getListIndex()).getGroupId()
                 + "," + accountList.get(common.getListIndex()).getTokenId();
 
@@ -652,7 +651,6 @@ public class MANETManageService extends Service implements
         mNM.notify(1, builder.build());
 
         //TODO: Discovererが受け取ったメッセージを基に新たなメッセージを作成・送信
-        //TODO: 強調
 
         // 相手からのメッセージを確認（して返送）済みか？
         if(mIsReceiving == true){
@@ -943,6 +941,7 @@ public class MANETManageService extends Service implements
      * デバイスをDiscoverモードに設定する。それにより、Advertiseモードの端末を待つ。このモードに成功
      * すると、{@link #onDiscoveryStarted()} ()} または {@link #onDiscoveryFailed()} ()} の
      * いずれかが呼び出される。
+     * 　※ 未使用
      */
     protected void startDiscovering() {
         Log.d(TAG,"startDiscovering");
@@ -1546,29 +1545,29 @@ public class MANETManageService extends Service implements
     }
 
     protected void onReceiveByAdvertiser(Endpoint endpoint, Payload payload) {
-        //自分からメッセージ送信済か？
         Log.d(TAG, "onReceiveByAdvertiser");
+        //自分からメッセージ送信済か？
         if(mIsReceiving = true){
-
+            String messageStr = new String( sendingNormalPayload.getPayload().asBytes() ); // Payloadをbyte型配列経由でString型に変換
+            String payloadStr = new String( payload.asBytes() ); // Payloadをbyte型配列経由でString型に変換
             //その中身は自分が送ったものと一致するか？
-            //メッセージ受信(Payload変換)
-            byte[] messageByte = payload.asBytes(); //Payload = byte型配列でメッセージを受信
-            String messageStr = new String(messageByte); // byte型配列メッセージをString型に変換
-            //例）(int) messageType + ”,” + (int) RREQ ID + “,” + (String) 終点アドレス + “,” + (int) 終点シーケンス番号 + “,” + (String) 送信元アドレス + “,” (int)送信元シーケンス番号
-            String st[] = messageStr.split(","); //messageStrの中身をカンマで区切ってstring配列の各項目に挿入
+            if(messageStr.equals(payloadStr)) {
+                //送ったメッセージと送り返されたメッセージとが一致すると判明したら、通信を切断する
+                Log.d(TAG, "onReceiveByAdvertiser: sendingNormalPayload == (received)payload");
+                setAdvState(adv_State.STOP); //Advertiseは次に送るべきものが出てくるまで終了
+                setDisState(dis_State.NORMAL); //Discoverを始める
 
-            //TODO:最低限、自分が送ったメッセージタイプは記録しておかないと判別が面倒
-            //もしくは送信する/した内容をそのままString型で保持しておくか
+                //TODO: RREQ送信用のシーケンス番号をインクリメント
 
-            //TODO: 送ったものと受け取ったものが一致すると判明したら、通信を切断する
-            setAdvState(adv_State.STOP); //Advertiseは次に送るべきものが出てくるまで終了
-            setDisState(dis_State.NORMAL); //Discoverを始める
-
-            //TODO: RREQ送信用のシーケンス番号をインクリメント
-
-            //TODO: RREPのprecursorリスト
-            // 経路表のRREP送信先ノードへのエントリー内のprecursorリストに次ホップのアドレス
-            // （Discoverer／RREP受け取った側のアドレス）を追加する（RERRメッセージ送信用に利用する）
+                //TODO: RREPのprecursorリスト
+                // 経路表のRREP送信先ノードへのエントリー内のprecursorリストに次ホップのアドレス
+                // （Discoverer／RREP受け取った側のアドレス）を追加する（RERRメッセージ送信用に利用する）
+            }else{
+                //送ったメールと送り返されたメッセージとが一致しない
+                Log.d(TAG, "onReceiveByAdvertiser: sendingNormalPayload != (received)payload");
+            }
+        }else{
+            Log.d(TAG, "onReceiveByAdvertiser: mIsReceiving != false");
         }
     }
 
