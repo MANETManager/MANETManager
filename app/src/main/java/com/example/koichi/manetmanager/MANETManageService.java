@@ -245,6 +245,7 @@ public class MANETManageService extends Service implements
 
                 @Override
                 public void onDisconnected(String endpointId) {
+                    Log.d(TAG, "onDisconnected");
                     if (!mEstablishedConnections.containsKey(endpointId)) {
                         Log.w(TAG, "Unexpected disconnection from endpoint " + endpointId);
 
@@ -484,6 +485,7 @@ public class MANETManageService extends Service implements
      * {@link #rejectConnection(Endpoint)}を呼び出します。.
      */
     protected void onConnectionInitiated(Endpoint endpoint, ConnectionInfo connectionInfo) {
+        Log.d(TAG, "onConnectionInitiated");
         /** 通知 **/
         builder.setContentText("onConnectionInitiated");
         mNM.notify(1, builder.build());
@@ -497,7 +499,8 @@ public class MANETManageService extends Service implements
         {
             //自分がDiscovererのとき
             //自端末のMACアドレスをmNameに入れて利用しているはずなので、それを流用する
-            if(mName.equals(mDestinationAddress)){
+            if(mDestinationAddress.equals(mName)){
+                Log.d(TAG, "onConnectionInitiated: I'm Discoverer & Destination Node");
                 //TODO:自分がDiscovererかつデスティノードのとき
                 //TODO:デスティネーションノードとアクセスポイントのアソシエーションがある／ない
                 /**
@@ -514,21 +517,25 @@ public class MANETManageService extends Service implements
                         (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
                 @Nullable NetworkInfo networkInfo = connectivityManager.getActiveNetworkInfo();
                 if (networkInfo != null && networkInfo.getType() == ConnectivityManager.TYPE_WIFI){
+                    Log.d(TAG, "onConnectionInitiated: I'm Discoverer & Destination Node, and have Network");
                     myRole = isMyRole.DESTIN;
                     //Wi-Fiでネットワークがアクティブになってる
                     acceptConnectionByDiscoverer(endpoint);
                 }else{
                     //それ以外
+                    Log.d(TAG, "onConnectionInitiated: I'm Discoverer & Destination Node, but have no Network");
                     rejectConnection(endpoint);
                 }
             }else{
                 ArrayList<Accounts> accountList = common.getAccountGroup();
                 if( mName.equals( accountList.get(common.getListIndex()).getSourceAddress() ) ){
+                    Log.d(TAG, "onConnectionInitiated: I'm Discoverer & Source Node");
                     //自分がDiscovererかつソースノードのとき
                     // すぐに接続を受け入れる。
                     myRole = isMyRole.SOURCE;
                     acceptConnectionByDiscoverer(endpoint);
                 }else {
+                    Log.d(TAG, "onConnectionInitiated: I'm Discoverer & Relay Node");
                     //自分がDiscovererかつ中継ノードのとき
                     /**
                     * if(中継ノードのGroupID == メッセージ内のGroupID) &&
@@ -536,10 +543,12 @@ public class MANETManageService extends Service implements
                     * SERVICE_IDが一致し通信確立を行えた時点で成立している
                     **/
                     if(common.getMbod() <= 0){
+                        Log.d(TAG, "onConnectionInitiated: I'm Discoverer & Relay Node but have no Mbod");
                         //グローバル変数のMbod（自端末バッテリー消費許容量の残り）が0かそれ以下
                         rejectConnection(endpoint);
                         return;
                     }else {
+                        Log.d(TAG, "onConnectionInitiated: I'm Discoverer & Relay Node and have enough Mbod");
                         //メッセージ残量に問題が見られない
                         myRole = isMyRole.RELAY;
                         //accept後、メッセージを受け取って解析へ
@@ -612,6 +621,7 @@ public class MANETManageService extends Service implements
                                 @Override
                                 public void onResult(@NonNull Status status) {
                                     if (!status.isSuccess()) {
+                                        Log.d(TAG, "Nearby.Connections.sendPayload: mIsReceiving = false");
                                         //sendPayloadの送信に失敗したとき
                                         Log.w(TAG,
                                                 String.format(
@@ -620,6 +630,7 @@ public class MANETManageService extends Service implements
                                         builder.setContentText("onEndpointConnected: sendPayload failed.");
                                         mNM.notify(1, builder.build());
                                     }else{
+                                        Log.d(TAG, "Nearby.Connections.sendPayload: mIsReceiving = true");
                                         //sendPayloadの送信に成功したとき
                                         mIsReceiving = true;
                                         // この後、Advertiserがこちらの送信に反応して切断するまで待機
@@ -631,6 +642,7 @@ public class MANETManageService extends Service implements
     }
 
     protected void onEndpointDisconnected(Endpoint endpoint) {
+        Log.d(TAG, "onEndpointDisconnected");
         /** 通知 */
         builder.setContentText("onEndpointDisconnected");
         mNM.notify(1, builder.build());
@@ -640,13 +652,14 @@ public class MANETManageService extends Service implements
 
         // 相手からのメッセージを確認（して返送）済みか？
         if(mIsReceiving == true){
+            Log.d(TAG, "onEndpointDisconnected: mIsReceiving = true");
             // 自分のノードの役割に応じて条件分岐
             switch(myRole){
                 case RELAY:
                     //中継ノード
-
                     // RREPメッセージを送信する場合に限り
                     if("2".equals( receivedPayload.getST(0) ) ){
+                        Log.d(TAG, "onEndpointDisconnected: I am RELAY Node & received RREP");
                         // RREPにおける経路表構築(RREQに関してはacceptConnectionByAdvertiser()にて行う)
                         // RREPにおける次ホップ = 自分の経路表に保存されている送信元ノードに関する次ホップアドレス
                         mRouteLists.put( receivedPayload.getST(2),
@@ -664,19 +677,20 @@ public class MANETManageService extends Service implements
                         sendingNormalPayload
                                 = new SendingNormalPayload( receivedPayload.getST(0),
                                 receivedPayload.getST(2),
-                                receivedPayload.getST(3),
+                                String.valueOf( parseInt(receivedPayload.getST(3) ) + 1 ),
                                 receivedPayload.getST(4),
                                 String.valueOf( mRouteLists.get( receivedPayload.getST(4) ).getSeqNum() )
                         );
                         // 経路探索-返信状態へ移行
                         setAdvState(adv_State.REPLY);
                     }else{
+                        Log.d(TAG, "onEndpointDisconnected: I am RELAY Node & received RREQ");
                         // RREQメッセージを送信する場合
                         // 受け取ったRREPを基にPayloadを作成
                         sendingNormalPayload
                                 = new SendingNormalPayload( receivedPayload.getST(0),
                                 receivedPayload.getST(2),
-                                String.valueOf( mRouteLists.get( receivedPayload.getST(2) ).getSeqNum() + 1 ),
+                                String.valueOf( parseInt(receivedPayload.getST(3) ) + 1 ),
                                 receivedPayload.getST(4),
                                 receivedPayload.getST(5)
                         );
@@ -685,33 +699,36 @@ public class MANETManageService extends Service implements
                     }
                     break;
                 case DESTIN:
+                    Log.d(TAG, "onEndpointDisconnected: I am DESTINATION Node & received RREQ");
                     //デスティネーションノード、RREQしか受け取らない（はず）
-
+                    /*※RREQの経路表追加はAdvertiserになって通信相手を見つけた後だよね？
                     //If(Discovererの（経路表の？）シーケンス番号 ＜ RREQメッセージの送信先シーケンス番号)ならば
                     if(mRouteLists.get( receivedPayload.getST(2) ).getSeqNum() < parseInt( receivedPayload.getST(3) ) ){
                         //Discovererのシーケンス番号 = 送信先シーケンス番号
                         mRouteLists.get( receivedPayload.getST(2) ).setSeqNum( parseInt( receivedPayload.getST(3) ) );
                         //送るRREPメッセージの送信先シーケンス番号 = Discovererのシーケンス番号
                             //mRouteLists.get( receivedPayload.getST(2) ).getSeqNum()を使えと。
-                    }
+                    }*/
+
+
                     // 受け取ったRREQを基に転送準備
                     // 送信先アドレスと送信元アドレスには、RREQに書かれていたものをコピーする
 
-                    //TODO:Discoverer自身のシーケンス番号
+                    //TODO:Discoverer自身のシーケンス番号の設定、Payloadのシーケンス番号設定
                     // 送るRREPメッセージの送信先シーケンス番号 = Discovererのシーケンス番号
-                    // mRouteLists.get( receivedPayload.getST(2) ).getSeqNum()を使えと。
+                    // ※mRouteLists.get( receivedPayload.getST(2) ).getSeqNum()をシーケンスに代入してnull Pointer出た
                     sendingNormalPayload
                             = new SendingNormalPayload( receivedPayload.getST(0),
                             receivedPayload.getST(2),
-                            String.valueOf( mRouteLists.get( receivedPayload.getST(2) ).getSeqNum() ),
+                            String.valueOf( parseInt(receivedPayload.getST(3) ) + 1 ),
                             receivedPayload.getST(4),
-                            String.valueOf( mRouteLists.get( receivedPayload.getST(2) ).getSeqNum() )
+                            String.valueOf( parseInt(receivedPayload.getST(3) ) + 1 )
                     );
                     // 経路探索-返信状態へ移行する。
                     setAdvState(adv_State.REPLY);
                     break;
                 case SOURCE:
-                    Log.d(TAG,"sourceNode: Received RREP");
+                    Log.d(TAG,"onEndpointDisconnected: I am sourceNode & Received RREP");
                     // ソースノード、RREQメッセージは受け取らない（はず）
 
                     // おそらくRREPメッセージを受け取っているので、
@@ -719,9 +736,12 @@ public class MANETManageService extends Service implements
                     setAdvState(adv_State.CONSTRUCTED);
                     break;
                 default:
+                    Log.d(TAG,"onEndpointDisconnected: cannot understand myRole:" + myRole );
                     // ここに来るのはエラーかAdvertiser？
             }
-
+        }else{
+            //mIsReceiving = false
+            Log.d(TAG, "onEndpointDisconnected: mIsReceiving = false");
         }
 
         Toast.makeText(
@@ -750,10 +770,11 @@ public class MANETManageService extends Service implements
         mNM.notify(1, builder.build());
 
         //依然探索状態であるか？（Discoverができない状況なら再試行する必要がない）
-        if (getDisState() == dis_State.NORMAL) {
+        if (getDisState() != dis_State.STOP) {
 
             //１回の接続要求に要した時間が異様に長いか？（8秒以上と仮定）
             if(timeOfConnectToEndPoint != 0 && System.currentTimeMillis()-timeOfConnectToEndPoint > 8000) {
+                Log.d(TAG,"onConnectionFailed(Endpoint endpoint)");
                 //１回の接続要求に要した時間が8秒以上の場合、接続先候補から現在の接続先を消去する
                 //※接続先候補が移動して通信圏外に動いた可能性を考慮
                 mDiscoveredEndpoints.remove(endpoint.getId());
@@ -763,6 +784,9 @@ public class MANETManageService extends Service implements
             if(!getDiscoveredEndpoints().isEmpty()) {
                 //DiscoveredEndpoints（接続先候補）からランダムに抽出して再試行
                 connectToEndpoint(pickRandomElem(getDiscoveredEndpoints()));
+            }else{
+                //Discoverを最初からやり直す
+                setDisState(dis_State.NORMAL);
             }
         }
     }
@@ -1226,7 +1250,6 @@ public class MANETManageService extends Service implements
         Log.d(TAG,"State set to " + state);
         dis_State oldState = mDisState;
         mDisState = state;
-        myRole = isMyRole.UNKNOWN;
         onDisStateChanged(oldState, state);
     }
 
@@ -1260,6 +1283,7 @@ public class MANETManageService extends Service implements
                 mNM.notify(2, builder.build());
 
                 //disconnectFromAllEndpoints(); //Cトークンの破棄を伝える関数
+                myRole = isMyRole.UNKNOWN;
                 stopDiscovering();
                 break;
             case NORMAL:
@@ -1275,6 +1299,7 @@ public class MANETManageService extends Service implements
                 if(common.getAccountGroup().get(common.getListIndex()).getTokenId() != null){
                     if(!common.getAccountGroup().get(common.getListIndex()).getTokenId().isEmpty()) {
                         //あるならDiscover開始してAdvertiseを待つ
+                        myRole = isMyRole.UNKNOWN;
                         startWaitByDiscovering();
                     }
                 }else{
@@ -1284,10 +1309,10 @@ public class MANETManageService extends Service implements
                 }
                 break;
             case CONNECTED:
-                Log.d(TAG,"state: CONNECTED");
+                Log.d(TAG,"dis_state: CONNECTED");
 
                 /** 通知 */
-                builder.setContentText("state: CONNECTED");
+                builder.setContentText("dis_state: CONNECTED");
                 mNM.notify(2, builder.build());
 
                 stopWaitByDiscovering();
@@ -1341,7 +1366,7 @@ public class MANETManageService extends Service implements
 
                 //通知
                 builder.setContentText("Adv_State: STOP");
-                mNM.notify(2, builder.build());
+                mNM.notify(3, builder.build());
 
                 disconnectFromAllEndpoints();
                 break;
@@ -1350,16 +1375,16 @@ public class MANETManageService extends Service implements
 
                 // 通知
                 builder.setContentText("Adv_state: NORMAL");
-                mNM.notify(2, builder.build());
+                mNM.notify(3, builder.build());
 
                 startAdvertising();
                 break;
             case REPLY:
-                Log.d(TAG,"dis_state: NORMAL");
+                Log.d(TAG,"Adv_state: NORMAL");
 
                 // 通知
-                builder.setContentText("dis_state: NORMAL");
-                mNM.notify(2, builder.build());
+                builder.setContentText("Adv_state: NORMAL");
+                mNM.notify(3, builder.build());
 
                 startAdvertising();
                 break;
@@ -1376,13 +1401,12 @@ public class MANETManageService extends Service implements
                 break;
                 */
             case CONSTRUCTED:
-                /*
-                Log.d(TAG,"dis_state: NORMAL");
+                Log.d(TAG,"Adv_state: CONSTRUCTED");
 
                 // 通知
-                builder.setContentText("dis_state: NORMAL");
-                mNM.notify(2, builder.build());
-
+                builder.setContentText("Adv_state: CONSTRUCTED");
+                mNM.notify(3, builder.build());
+                /*
                 stopDiscovering();
                 stopAdvertising();
                 break;
@@ -1419,6 +1443,7 @@ public class MANETManageService extends Service implements
      * @param payload （送信者から送られてきた）データ。
      */
     protected void onReceiveByDiscoverer(Endpoint endpoint, Payload payload){
+        Log.d(TAG, "onPayloadReceivedByDiscoverer");
         // メッセージ受信(Payload変換)
         receivedPayload = new ReceivedPayload(payload);
 
@@ -1451,10 +1476,12 @@ public class MANETManageService extends Service implements
                 if(receivedPayload.getST(0) == "1" && mRouteLists.get(receivedPayload.getST(2)) != null){
                     // 自分の経路表の有効な終点シーケンス番号が受け取ったRREQの終点シーケンス番号以上か？
                     if(mRouteLists.get(receivedPayload.getST(2)).getSeqNum() >= parseInt(receivedPayload.getST(3)) ){
+                        Log.d(TAG, "onPayloadReceivedByDiscoverer: RREQの終点アドレスへの経路表を持っている");
                         //TODO: 受け取ったRREQを基にしたRREPメッセージを送り返す
 
                     }
                 }else{
+                    Log.d(TAG, "onPayloadReceivedByDiscoverer: message will be replied  ");
                     // RREPを受け取った、RREQを受け取ったけどすでに経路構築されているわけではない、etc
                     // →同一内容（受け取ったpayloadそのまま）で送り返す
                     // ※ここのendpoint.getId()でエラーが出るなら、mPayloadCallbackByDiscovererから
@@ -1465,6 +1492,7 @@ public class MANETManageService extends Service implements
                                         @Override
                                         public void onResult(@NonNull Status status) {
                                             if (!status.isSuccess()) {
+                                                Log.d(TAG, "Nearby.Connections.sendPayload: mIsReceiving = false");
                                                 //sendPayloadの送信に失敗したとき
                                                 Log.w(TAG,
                                                         String.format(
@@ -1473,6 +1501,7 @@ public class MANETManageService extends Service implements
                                                 builder.setContentText("onReceiveByDiscoverer: sendPayload failed.");
                                                 mNM.notify(1, builder.build());
                                             }else{
+                                                Log.d(TAG, "Nearby.Connections.sendPayload: mIsReceiving = true");
                                                 //sendPayloadの送信に成功したとき
                                                 mIsReceiving = true;
                                                 // この後、Advertiserがこちらの送信に反応して切断するまで待機
