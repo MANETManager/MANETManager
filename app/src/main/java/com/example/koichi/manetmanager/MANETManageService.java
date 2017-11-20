@@ -431,7 +431,7 @@ public class MANETManageService extends Service implements
     }
 
     /**
-     * Nearby Connectionsに接続した。{@link #startDiscovering()} と　{@link #startAdvertising()} を
+     * Nearby Connectionsに接続した。{@link #startWaitByDiscovering()} と　{@link #startAdvertising()} を
      * 呼び出すことができる。
      * ※おそらくmGoogleApiClient.connect()が成功した後に反応する
      */
@@ -556,10 +556,42 @@ public class MANETManageService extends Service implements
                 }
             }
         }else{
-            // 自分がAdvertiserのとき
-            // すぐに接続を受け入れる。
-            acceptConnectionByAdvertiser(endpoint);
-        }
+            //TODO: ここがうまく動作するかテストする
+            Log.d(TAG,String.format("onConnectionInitiated: I'm Advertiser"));
+            /*
+             * 自分がRREPを送る場合は、相手が送信元アドレスに関する自らの経路表に記された
+             * 次ホップアドレスと一致するかを調べる。
+             */
+            //これから自分が送信するのはRREPか？
+            if( "2".equals(sendingNormalPayload.getMessageType() ) ){
+                //自分が送るのはRREP
+                //ぬるぽ回避用：そもそも「これから送るpayloadの送信元アドレス」が自分の経路表に含まれるか？
+                if(mRouteLists.containsKey( sendingNormalPayload.getSourceAddress() ) ){
+                    Log.d(TAG,String.format("onConnectionInitiated: have Source Address in sendingNormalPayload"));
+                    //送信元アドレスに関連付けられた経路表の次ホップアドレスは通信相手のアドレスと一致するか？
+                    if(mRouteLists.get( sendingNormalPayload.getSourceAddress() ).getHopAdd()
+                            == endpoint.getName() ){
+                        //一致する
+                        Log.d(TAG,String.format("onConnectionInitiated: NextHopAddress == endpoint's Address"));
+                        // 接続を受け入れる。
+                        acceptConnectionByAdvertiser(endpoint);
+                    }else{
+                        //一致しない
+                        Log.d(TAG,String.format("onConnectionInitiated: NextHopAddress != endpoint's Address"));
+                        rejectConnection(endpoint);
+                    }
+                }else{
+                    Log.d(TAG,String.format("onConnectionInitiated: 「これから送るpayloadの送信元アドレス」が自分の経路表に含まれていない"));
+                    //「これから送るpayloadの送信元アドレス」が自分の経路表に含まれていない
+                    rejectConnection(endpoint);
+                }
+            }else{
+                Log.d(TAG,String.format("onConnectionInitiated: not RREP"));
+                //自分が送るのはRREP以外
+                // 接続を受け入れる。
+                acceptConnectionByAdvertiser(endpoint);
+            }//if( "2".equals(sendingNormalPayload.getMessageType() ) )ここまで
+        }//if(connectionInfo.isIncomingConnection() == false)ここまで
     }
 
     private void connectedToEndpoint(Endpoint endpoint) {
@@ -943,10 +975,9 @@ public class MANETManageService extends Service implements
      * いずれかが呼び出される。
      * 　※ 未使用
      */
-    protected void startDiscovering() {
+    /*protected void startDiscovering() {
         Log.d(TAG,"startDiscovering");
 
-        /** 通知 */
         builder.setContentText("startDiscovering");
         mNM.notify(1, builder.build());
 
@@ -973,8 +1004,6 @@ public class MANETManageService extends Service implements
                     @Override
                     public void onEndpointLost(String endpointId) {
                         Log.d(TAG,String.format("onEndpointLost(endpointId=%s)", endpointId));
-
-                        /** 通知 */
                         builder.setContentText("onEndpointLost");
                         mNM.notify(1, builder.build());
                     }
@@ -992,7 +1021,6 @@ public class MANETManageService extends Service implements
                                             String.format(
                                                     "Discovering failed. Received status "
                                             ));
-                                    /** 通知 */
                                     builder.setContentText("DiscoveryOptions: Discovering failed.");
                                     mNM.notify(1, builder.build());
 
@@ -1000,7 +1028,7 @@ public class MANETManageService extends Service implements
                                 }
                             }
                         });
-    }
+    }*/
 
     /**
      * Discoverモードを停止する。
@@ -1036,7 +1064,7 @@ public class MANETManageService extends Service implements
         Log.d(TAG,"startWaitByDiscovering");
 
         /** 通知 */
-        builder.setContentText("startDiscovering");
+        builder.setContentText("startWaitByDiscovering");
         mNM.notify(1, builder.build());
 
         mIsDiscovering = true;
@@ -1054,13 +1082,21 @@ public class MANETManageService extends Service implements
                                 String.format(
                                         "onEndpointFound(endpointId=%s, serviceId=%s, endpointName=%s)",
                                         endpointId, info.getServiceId(), info.getEndpointName()));
-                        /** もしも自身と通信相手のServiceIdが一致していたら **/
-                        if (getServiceId().equals(info.getServiceId())) {
+
+                        // 自分と通信相手候補のServiceIdが一致しているか？
+                        // 通信相手候補のName(MACアドレス)と一致するNextHopを含む経路表を自分は持っているか？
+                        if (getServiceId().equals(info.getServiceId() ) && !isRouteMapHaveNextHopAdd(mRouteLists,info.getEndpointName() ) ){
+                            Log.d(TAG,"onEndpointFound: ServiceId & !NextHopAdd = true");
+                            // ServiceIdが一致している&&通信相手候補のName(MACアドレス)と一致するNextHopを含む経路表を持っていない
                             Endpoint endpoint = new Endpoint(endpointId, info.getEndpointName());
                             mDiscoveredEndpoints.put(endpointId, endpoint);
                             onEndpointDiscovered(endpoint);
+                        }else{
+                            Log.d(TAG,"onEndpointFound: ServiceId & !NextHopAdd = false");
+                            // ServiceIdが一致していない||通信相手候補のName(MACアドレス)と一致するNextHopを含む経路表を持っている
+                            // 通信相手候補は無視してDiscoveryを再開する
+                            setDisState(dis_State.NORMAL);
                         }
-                        /** ServiceIdが一致していなければ、Advertiserに対して何もしない＝通信を破棄する **/
                     }
 
                     @Override
@@ -1089,7 +1125,6 @@ public class MANETManageService extends Service implements
                                     /** 通知 */
                                     builder.setContentText("DiscoveryOptions: Discovering failed.");
                                     mNM.notify(1, builder.build());
-
                                     onDiscoveryFailed();
                                 }
                             }
@@ -1256,13 +1291,11 @@ public class MANETManageService extends Service implements
      * @param state 次に変化させるdis_State。
      */
     private void setDisState(dis_State state){
-        Log.d(TAG, "setDisState");
-
         /** 通知 */
         builder.setContentText("setDisState");
         mNM.notify(1, builder.build());
 
-        Log.d(TAG,"State set to " + state);
+        Log.d(TAG,"setDisState: to " + state);
         dis_State oldState = mDisState;
         mDisState = state;
         onDisStateChanged(oldState, state);
@@ -1344,13 +1377,11 @@ public class MANETManageService extends Service implements
      * @param state 次に変化させるadv_State。
      */
     private void setAdvState(adv_State state){
-        Log.d(TAG, "setAdvState");
-
         /** 通知 */
         builder.setContentText("setAdvState");
         mNM.notify(1, builder.build());
 
-        Log.d(TAG,"State set to " + state);
+        Log.d(TAG,"setAdvState: to " + state);
         adv_State oldState = mAdvState;
         mAdvState = state;
         onAdvStateChanged(oldState, state);
@@ -1386,19 +1417,19 @@ public class MANETManageService extends Service implements
                 disconnectFromAllEndpoints();
                 break;
             case REQUEST:
-                Log.d(TAG,"Adv_state: NORMAL");
+                Log.d(TAG,"Adv_state: REQUEST");
 
                 // 通知
-                builder.setContentText("Adv_state: NORMAL");
+                builder.setContentText("Adv_state: REQUEST");
                 mNM.notify(3, builder.build());
 
                 startAdvertising();
                 break;
             case REPLY:
-                Log.d(TAG,"Adv_state: NORMAL");
+                Log.d(TAG,"Adv_state: REPLY");
 
                 // 通知
-                builder.setContentText("Adv_state: NORMAL");
+                builder.setContentText("Adv_state: REPLY");
                 mNM.notify(3, builder.build());
 
                 startAdvertising();
@@ -1853,6 +1884,31 @@ public class MANETManageService extends Service implements
         );
         // 経路探索-要求状態へ移行
         setAdvState(adv_State.REQUEST);
+    }
+
+    /*
+     * 第一引数に指定した経路表マップに含まれる経路表を片っ端から調べ、
+     * 第二引数に指定したアドレスに一致するNextHopAddressを持つ
+     * 経路表があるか否かを調べるメソッド
+     * （onEndpointFoundで使用）
+     */
+    public boolean isRouteMapHaveNextHopAdd(Map<String, RouteList> map, String searchAddress){
+        Log.d(TAG, "isRouteMapHaveNextHopAdd");
+        //mapに含まれる全てのキーをkey変数に代入し、for文でそれぞれについて処理を行う
+        for (String key : map.keySet() ) {
+            if( searchAddress.equals( map.get(key).getHopAdd() ) ){
+                /*
+                 * もしもmapに含まれるとあるキーに対応する経路表に含まれるNextHopAddressが
+                 * 第二引数に指定したアドレス（通信相手候補のmName = MACアドレスを想定）と
+                 * 一致するならば、trueを返す
+                 */
+                Log.d(TAG, "isRouteMapHaveNextHopAdd: Return true");
+                return true;
+            }
+        }
+        //MAPの全てのキーに対応する経路表を調べても一致するアドレスが無かった場合
+        Log.d(TAG, "isRouteMapHaveNextHopAdd: Return false");
+        return false;
     }
 
     //TODO: 自端末のMBODを減少させるメソッドが要る？
