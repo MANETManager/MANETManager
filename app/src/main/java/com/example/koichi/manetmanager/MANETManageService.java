@@ -600,11 +600,14 @@ public class MANETManageService extends Service implements
 
         //もしもadv_Stateが有効である(STOP以外)
         if(mAdvState != adv_State.STOP){
+            /*
             //送ろうとしているのがRREQならば
             if("1".equals( sendingNormalPayload.getMessageType() ) ){
                 //RREQを送るAdvertiserの経路表構築を行う
                 //けどさすがに自分への経路表は作らなくていいから（良心）
                 if( !mName.equals( sendingNormalPayload.getSourceAddress() ) ){
+                    //もしも"自分のアドレス != これから送るRREQの送信元アドレス"なら
+                    //経路表に送信元アドレス,シーケンス番号+1,相手の端末アドレスを追加
                     mRouteLists.put(sendingNormalPayload.getSourceAddress(),
                             new RouteList(sendingNormalPayload.getSourceAddress(),
                                     parseInt( sendingNormalPayload.getSourceSeqNum() ) + 1,
@@ -614,6 +617,7 @@ public class MANETManageService extends Service implements
                     );
                 }
             }
+            */
             //adv_Stateが有効 = 何か送りたいPayloadがあるので、それを送る
             Nearby.Connections.sendPayload( mGoogleApiClient,endpoint.getId(), sendingNormalPayload.getPayload() )
                     .setResultCallback(
@@ -656,16 +660,38 @@ public class MANETManageService extends Service implements
             // 自分のノードの役割に応じて条件分岐
             switch(myRole){
                 case RELAY:
-                    //中継ノード
-                    // RREPメッセージを送信する場合に限り
-                    if("2".equals( receivedPayload.getST(0) ) ){
+                    // 中継ノード
+                    // RREPメッセージを受信した場合
+                    if("1".equals( receivedPayload.getST(0) ) ){
+                        Log.d(TAG, "onEndpointDisconnected: I am RELAY Node & received RREQ");
+                        // RREQにおける経路表構築
+                        // 次ホップアドレス = メッセージを送ってきた相手のアドレス
+                        mRouteLists.put( receivedPayload.getST(4),
+                                new RouteList(receivedPayload.getST(4),
+                                        parseInt( receivedPayload.getST(5) ) + 1,
+                                        endpoint.getName(),
+                                        3600) );
+
+                        // RREQメッセージを送信するために
+                        // 受け取ったRREQを基にPayloadを作成
+                        sendingNormalPayload
+                                = new SendingNormalPayload( receivedPayload.getST(0),
+                                receivedPayload.getST(2),
+                                String.valueOf( parseInt(receivedPayload.getST(3) ) + 1 ),
+                                receivedPayload.getST(4),
+                                receivedPayload.getST(5)
+                        );
+                        // 経路探索-要求状態へ移行
+                        setAdvState(adv_State.REQUEST);
+
+                    }else if("2".equals( receivedPayload.getST(0) ) ){
                         Log.d(TAG, "onEndpointDisconnected: I am RELAY Node & received RREP");
-                        // RREPにおける経路表構築(RREQに関してはacceptConnectionByAdvertiser()にて行う)
-                        // RREPにおける次ホップ = 自分の経路表に保存されている送信元ノードに関する次ホップアドレス
+                        // RREPにおける経路表構築
+                        // 次ホップアドレス = メッセージを送ってきた相手のアドレス
                         mRouteLists.put( receivedPayload.getST(2),
                                 new RouteList(receivedPayload.getST(2),
                                         parseInt( receivedPayload.getST(3) ) + 1,
-                                        mRouteLists.get( receivedPayload.getST(4) ).getHopAdd(),
+                                        endpoint.getName(),
                                         3600) );
                         // 経路表の送信元ノード（RREQの作成者）へのエントリー内のprecursorリストに前ホップのIPアドレスを、
                         mRouteLists.get( receivedPayload.getST(4) ).addPrecursor( endpoint.getName() );
@@ -684,18 +710,8 @@ public class MANETManageService extends Service implements
                         // 経路探索-返信状態へ移行
                         setAdvState(adv_State.REPLY);
                     }else{
-                        Log.d(TAG, "onEndpointDisconnected: I am RELAY Node & received RREQ");
-                        // RREQメッセージを送信する場合
-                        // 受け取ったRREPを基にPayloadを作成
-                        sendingNormalPayload
-                                = new SendingNormalPayload( receivedPayload.getST(0),
-                                receivedPayload.getST(2),
-                                String.valueOf( parseInt(receivedPayload.getST(3) ) + 1 ),
-                                receivedPayload.getST(4),
-                                receivedPayload.getST(5)
-                        );
-                        // 経路探索-要求状態へ移行
-                        setAdvState(adv_State.REQUEST);
+                        // 中継ノードがRREQ,RREP以外を受け取った
+                        Log.d(TAG, "onEndpointDisconnected: I am RELAY Node & received ???");
                     }
                     break;
                 case DESTIN:
