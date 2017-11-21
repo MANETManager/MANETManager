@@ -693,7 +693,7 @@ public class MANETManageService extends Service implements
             switch(myRole){
                 case RELAY:
                     // 中継ノード
-                    // RREPメッセージを受信した場合
+                    // RREQメッセージを受信した場合
                     if("1".equals( receivedPayload.getST(0) ) ){
                         Log.d(TAG, "onEndpointDisconnected: I am RELAY Node & received RREQ");
                         // RREQにおける経路表構築
