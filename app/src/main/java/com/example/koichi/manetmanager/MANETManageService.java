@@ -514,6 +514,7 @@ public class MANETManageService extends Service implements
 
                 ConnectivityManager connectivityManager =
                         (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+                //TODO: ↓Wi-Fi Directも"TYPE_WIFI"だと判定してしまう
                 @Nullable NetworkInfo networkInfo = connectivityManager.getActiveNetworkInfo();
                 if (networkInfo != null && networkInfo.getType() == ConnectivityManager.TYPE_WIFI){
                     Log.d(TAG, "onConnectionInitiated: I'm Discoverer & Destination Node, and have Network");
@@ -586,6 +587,7 @@ public class MANETManageService extends Service implements
                     rejectConnection(endpoint);
                 }
             }else{
+                //TODO:もしもRREQなら、既に経路表を受け取った相手の場合はrejectする
                 Log.d(TAG,String.format("onConnectionInitiated: not RREP"));
                 //自分が送るのはRREP以外
                 // 接続を受け入れる。
@@ -866,7 +868,7 @@ public class MANETManageService extends Service implements
         mIsAdvertising = true;
         Nearby.Connections.startAdvertising(
                 mGoogleApiClient,
-                getName(),
+                getName() + "," + sendingNormalPayload.getMessageType(),
                 getServiceId(),
                 mConnectionLifecycleCallback,
                 new AdvertisingOptions(STRATEGY))
@@ -1082,23 +1084,47 @@ public class MANETManageService extends Service implements
                                 String.format(
                                         "onEndpointFound(endpointId=%s, serviceId=%s, endpointName=%s)",
                                         endpointId, info.getServiceId(), info.getEndpointName()));
-
                         // 自分と通信相手候補のServiceIdが一致しているか？
-                        // 通信相手候補のName(MACアドレス)と一致するNextHopを含む経路表を自分は持っているか？
-                        if (getServiceId().equals(info.getServiceId() ) && !isRouteMapHaveNextHopAdd(mRouteLists,info.getEndpointName() ) ){
-                            Log.d(TAG,"onEndpointFound: ServiceId & !NextHopAdd = true");
-                            // ServiceIdが一致している&&通信相手候補のName(MACアドレス)と一致するNextHopを含む経路表を持っていない
+                        if (getServiceId().equals(info.getServiceId() ) ){
+                            Log.d(TAG,"onEndpointFound: ServiceId = true");
+                            // ServiceIdが一致している
                             Endpoint endpoint = new Endpoint(endpointId, info.getEndpointName());
-                            mDiscoveredEndpoints.put(endpointId, endpoint);
-                            onEndpointDiscovered(endpoint);
+                            switch(endpoint.getMessageType() ){
+                                case "1":
+                                    //相手のAdvertiserはRREQを送りたい
+                                    // 通信相手候補のName(MACアドレス)と一致するNextHopを含む経路表を自分は持っているか？
+                                    if( !isRouteMapHaveNextHopAdd(mRouteLists,info.getEndpointName() ) ) {
+                                        Log.d(TAG,"onEndpointFound: Endpoint = RREQ && RouteList = false");
+                                        //通信相手候補のName(MACアドレス)と一致するNextHopを含む経路表を持っていない
+                                        mDiscoveredEndpoints.put(endpointId, endpoint);
+                                        onEndpointDiscovered(endpoint);
+                                    }else{
+                                        Log.d(TAG,"onEndpointFound: Endpoint = RREQ && RouteList = true");
+                                        //通信相手候補のName(MACアドレス)と一致するNextHopを含む経路表を持っている
+                                        // 通信相手候補は無視してDiscoveryを再開する
+                                        setDisState(dis_State.NORMAL);
+                                    }
+                                    break;
+                                case "2":
+                                case "3":
+                                    Log.d(TAG,"onEndpointFound: Endpoint = RERR / RREP");
+                                    //相手のAdvertiserはRERRかRREPを送りたい
+                                    mDiscoveredEndpoints.put(endpointId, endpoint);
+                                    onEndpointDiscovered(endpoint);
+                                    break;
+                                default:
+                                    Log.d(TAG,"onEndpointFound: Endpoint = Unknown");
+                                    //相手のAdvertiserに送りたいメッセージが無いのはおかしい
+                                    // 通信相手候補は無視してDiscoveryを再開する
+                                    setDisState(dis_State.NORMAL);
+                            }
                         }else{
-                            Log.d(TAG,"onEndpointFound: ServiceId & !NextHopAdd = false");
-                            // ServiceIdが一致していない||通信相手候補のName(MACアドレス)と一致するNextHopを含む経路表を持っている
+                            Log.d(TAG,"onEndpointFound: ServiceId = false");
+                            // ServiceIdが一致していない
                             // 通信相手候補は無視してDiscoveryを再開する
                             setDisState(dis_State.NORMAL);
                         }
-                    }
-
+                    }//public void onEndpointFound(String endpointId, DiscoveredEndpointInfo info)
                     @Override
                     public void onEndpointLost(String endpointId) {
                         Log.d(TAG,String.format("onEndpointLost(endpointId=%s)", endpointId));
@@ -1683,10 +1709,17 @@ public class MANETManageService extends Service implements
     protected static class Endpoint {
         @NonNull private final String id;
         @NonNull private final String name;
+        private final String messageType;
 
         private Endpoint(@NonNull String id, @NonNull String name) {
             this.id = id;
-            this.name = name;
+            String[] splitName = name.split(",",2);
+            if(splitName.length > 1)
+                this.messageType = splitName[1];
+            else
+                this.messageType = "0";
+
+            this.name = splitName[0];
         }
 
         @NonNull
@@ -1697,6 +1730,10 @@ public class MANETManageService extends Service implements
         @NonNull
         public String getName() {
             return name;
+        }
+
+        public String getMessageType(){
+            return messageType;
         }
 
         @Override
@@ -1717,7 +1754,7 @@ public class MANETManageService extends Service implements
         public String toString() {
             return String.format("Endpoint{id=%s, name=%s}", id, name);
         }
-    }
+    }//protected static class Endpoint
 
     /**
      * 経路表クラス
