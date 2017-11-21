@@ -51,6 +51,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.StringTokenizer;
+import java.util.TimerTask;
 
 import static java.lang.Integer.parseInt;
 
@@ -698,6 +699,8 @@ public class MANETManageService extends Service implements
                         Log.d(TAG, "onEndpointDisconnected: I am RELAY Node & received RREQ");
                         // RREQにおける経路表構築
                         // 次ホップアドレス = メッセージを送ってきた相手のアドレス
+                        Log.d(TAG, "onEndpointDisconnected: 送信元=" + receivedPayload.getST(4) );
+                        Log.d(TAG, "onEndpointDisconnected: 次ホップ=" + endpoint.getName() );
                         mRouteLists.put( receivedPayload.getST(4),
                                 new RouteList(receivedPayload.getST(4),
                                         parseInt( receivedPayload.getST(5) ) + 1,
@@ -1053,6 +1056,7 @@ public class MANETManageService extends Service implements
     }
 
     /** Discoveryモードの開始に失敗した。このメソッドをオーバーライドして、イベントを処理する。 */
+    //TODO: DiscovertyFailed、Wakietakieはどうやって復帰してるの？
     protected void onDiscoveryFailed() {
         Log.d(TAG,"onDiscoveryFailed");
     }
@@ -1086,44 +1090,52 @@ public class MANETManageService extends Service implements
                                         endpointId, info.getServiceId(), info.getEndpointName()));
                         // 自分と通信相手候補のServiceIdが一致しているか？
                         if (getServiceId().equals(info.getServiceId() ) ){
-                            Log.d(TAG,"onEndpointFound: ServiceId = true");
                             // ServiceIdが一致している
+                            Log.d(TAG,"onEndpointFound: ServiceId = true");
+                            // メッセージタイプ取得準備
                             Endpoint endpoint = new Endpoint(endpointId, info.getEndpointName());
-                            switch(endpoint.getMessageType() ){
-                                case "1":
-                                    //相手のAdvertiserはRREQを送りたい
-                                    // 通信相手候補のName(MACアドレス)と一致するNextHopを含む経路表を自分は持っているか？
-                                    if( !isRouteMapHaveNextHopAdd(mRouteLists,info.getEndpointName() ) ) {
-                                        Log.d(TAG,"onEndpointFound: Endpoint = RREQ && RouteList = false");
-                                        //通信相手候補のName(MACアドレス)と一致するNextHopを含む経路表を持っていない
+                            //endpointのメッセージタイプと、自分が直近に送ったメッセージタイプが被っていないか？
+                            if(sendingNormalPayload != null
+                                    && sendingNormalPayload.getMessageType().equals( endpoint.getMessageType() ) ){
+                                // 被っているのでRequestを行わずDiscoveryを再開する
+                                setDisState(dis_State.NORMAL);
+                            }else{
+                                switch(endpoint.getMessageType() ){
+                                    case "1":
+                                        //相手のAdvertiserはRREQを送りたい
+                                        // 通信相手候補のName(MACアドレス)と一致するNextHopを含む経路表を自分は持っているか？
+                                        if( !isRouteMapHaveNextHopAdd(mRouteLists,info.getEndpointName() ) ) {
+                                            Log.d(TAG,"onEndpointFound: Endpoint = RREQ && RouteList = false");
+                                            //通信相手候補のName(MACアドレス)と一致するNextHopを含む経路表を持っていない
+                                            mDiscoveredEndpoints.put(endpointId, endpoint);
+                                            onEndpointDiscovered(endpoint);
+                                        }else{
+                                            Log.d(TAG,"onEndpointFound: Endpoint = RREQ && RouteList = true");
+                                            //通信相手候補のName(MACアドレス)と一致するNextHopを含む経路表を持っている
+                                            // 通信相手候補は無視してDiscoveryを再開する
+                                            setDisState(dis_State.NORMAL);
+                                        }
+                                        break;
+                                    case "2":
+                                    case "3":
+                                        Log.d(TAG,"onEndpointFound: Endpoint = RERR / RREP");
+                                        //相手のAdvertiserはRERRかRREPを送りたい
                                         mDiscoveredEndpoints.put(endpointId, endpoint);
                                         onEndpointDiscovered(endpoint);
-                                    }else{
-                                        Log.d(TAG,"onEndpointFound: Endpoint = RREQ && RouteList = true");
-                                        //通信相手候補のName(MACアドレス)と一致するNextHopを含む経路表を持っている
+                                        break;
+                                    default:
+                                        Log.d(TAG,"onEndpointFound: Endpoint = Unknown");
+                                        //相手のAdvertiserに送りたいメッセージが無いのはおかしい
                                         // 通信相手候補は無視してDiscoveryを再開する
                                         setDisState(dis_State.NORMAL);
-                                    }
-                                    break;
-                                case "2":
-                                case "3":
-                                    Log.d(TAG,"onEndpointFound: Endpoint = RERR / RREP");
-                                    //相手のAdvertiserはRERRかRREPを送りたい
-                                    mDiscoveredEndpoints.put(endpointId, endpoint);
-                                    onEndpointDiscovered(endpoint);
-                                    break;
-                                default:
-                                    Log.d(TAG,"onEndpointFound: Endpoint = Unknown");
-                                    //相手のAdvertiserに送りたいメッセージが無いのはおかしい
-                                    // 通信相手候補は無視してDiscoveryを再開する
-                                    setDisState(dis_State.NORMAL);
-                            }
+                                }//switch(endpoint.getMessageType() )
+                            }//if(sendingNormalPayload != null &&
                         }else{
                             Log.d(TAG,"onEndpointFound: ServiceId = false");
                             // ServiceIdが一致していない
                             // 通信相手候補は無視してDiscoveryを再開する
                             setDisState(dis_State.NORMAL);
-                        }
+                        }//if (getServiceId().equals(info.getServiceId() ) )
                     }//public void onEndpointFound(String endpointId, DiscoveredEndpointInfo info)
                     @Override
                     public void onEndpointLost(String endpointId) {
