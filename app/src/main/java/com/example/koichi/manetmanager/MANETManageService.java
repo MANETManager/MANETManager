@@ -504,8 +504,6 @@ public class MANETManageService extends Service implements
             //自端末のMACアドレスをmNameに入れて利用しているはずなので、それを流用する
             if(mDestinationAddress.equals(mName)){
                 Log.d(TAG, "onConnectionInitiated: I'm Discoverer & Destination Node");
-                //TODO:自分がDiscovererかつデスティノードのとき
-                //TODO:デスティネーションノードとアクセスポイントのアソシエーションがある／ない
                 /**
                  * Wi-Fi使って他端末とConnectionInitiatedしてる可能性あるのにどうするの？大丈夫？
                  * 最悪、今回の研究においては「デスティネーションノード端末は固定」
@@ -518,6 +516,7 @@ public class MANETManageService extends Service implements
 
                 ConnectivityManager connectivityManager =
                         (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+                //TODO:デスティネーションノードとアクセスポイントのアソシエーションがある／ない
                 //TODO: ↓Wi-Fi Directも"TYPE_WIFI"だと判定してしまう
                 @Nullable NetworkInfo networkInfo = connectivityManager.getActiveNetworkInfo();
                 if (networkInfo != null && networkInfo.getType() == ConnectivityManager.TYPE_WIFI){
@@ -561,7 +560,6 @@ public class MANETManageService extends Service implements
                 }
             }
         }else{
-            //TODO: ここがうまく動作するかテストする
             Log.d(TAG,String.format("onConnectionInitiated: I'm Advertiser"));
             /*
              * 自分がRREPを送る場合は、相手が送信元アドレスに関する自らの経路表に記された
@@ -691,9 +689,6 @@ public class MANETManageService extends Service implements
         /** 通知 */
         builder.setContentText("onEndpointDisconnected");
         mNM.notify(1, builder.build());
-
-        //TODO: Discovererが受け取ったメッセージを基に新たなメッセージを作成・送信
-
         // 相手からのメッセージを確認（して返送）済みか？
         if(mIsReceiving == true){
             Log.d(TAG, "onEndpointDisconnected: mIsReceiving = true");
@@ -740,7 +735,6 @@ public class MANETManageService extends Service implements
                         // 送信先ノード（RREQの宛先）へのエントリー内のprecursorリストに次ホップのIPアドレスを追加
                         // 次ホップのIPアドレス = 自分の経路表に保存されている送信元ノードに関する次ホップアドレス
                         mRouteLists.get( receivedPayload.getST(2) ).addPrecursor( mRouteLists.get( receivedPayload.getST(4) ).getHopAdd() );
-
                         // 受け取ったRREPを基にPayloadを作成
                         sendingNormalPayload
                                 = new SendingNormalPayload( receivedPayload.getST(0),
@@ -767,7 +761,6 @@ public class MANETManageService extends Service implements
                         //送るRREPメッセージの送信先シーケンス番号 = Discovererのシーケンス番号
                             //mRouteLists.get( receivedPayload.getST(2) ).getSeqNum()を使えと。
                     }*/
-                    //TODO:デスティノードに経路表作れ
                     // RREQにおける経路表構築
                     // 次ホップアドレス = メッセージを送ってきた相手のアドレス
                     Log.d(TAG, "onEndpointDisconnected: 送信元=" + receivedPayload.getST(4) );
@@ -1079,7 +1072,6 @@ public class MANETManageService extends Service implements
     }
 
     /** Discoveryモードの開始に失敗した。このメソッドをオーバーライドして、イベントを処理する。 */
-    //TODO: DiscovertyFailed、Wakietakieはどうやって復帰してるの？
     protected void onDiscoveryFailed() {
         Log.d(TAG,"onDiscoveryFailed");
     }
@@ -1563,16 +1555,13 @@ public class MANETManageService extends Service implements
         Log.d(TAG, "onPayloadReceivedByDiscoverer");
         // メッセージ受信(Payload変換)
         receivedPayload = new ReceivedPayload(payload);
-
         //TODO: シークエンス番号を比較してpayloadのほうが古かったらpayloadを破棄する
-
         /**
          * 宛先ノードに関するシーケンス番号が最新であることを確認するため，
          * ノードは現在のシーケンス番号の数値を，受信したメッセージのシーケンス番号と比較する.
          * 受信したメッセージのシーケンス番号から現在のシーケンス番号を引いた値が0未満である場合，
          * 受信したシーケンス番号は古い情報であるため，メッセージの宛先ノードに関する情報は破棄される.
          */
-
         // メッセージ全体のうち1つ目のトークンのString値によってメッセージ内容を判別
         if(receivedPayload.getST(0) == null){
             Log.d(TAG, "onPayloadReceivedByDiscoverer: messageJudge is Null!");
@@ -1580,7 +1569,7 @@ public class MANETManageService extends Service implements
             case "1":
             case "2":
                 /**
-                 * RREQの場合
+                 * RREQ/RREPの場合
                  * RREQメッセージに指定されている送信先へのアクティブな経路を自分が持っていて
                  * （ if(mRouteLists.get(st[4]) != null) ）、
                  * 自身の有効な送信先（終点）シーケンス番号がRREQメッセージの送信先（終点）シーケンス番号以上
@@ -1595,10 +1584,9 @@ public class MANETManageService extends Service implements
                     if(mRouteLists.get(receivedPayload.getST(2)).getSeqNum() >= parseInt(receivedPayload.getST(3)) ){
                         Log.d(TAG, "onPayloadReceivedByDiscoverer: RREQの終点アドレスへの経路表を持っている");
                         //TODO: 受け取ったRREQを基にしたRREPメッセージを送り返す
-
                     }
                 }else{
-                    Log.d(TAG, "onPayloadReceivedByDiscoverer: message will be replied  ");
+                    Log.d(TAG, "onPayloadReceivedByDiscoverer: message will be replied");
                     // RREPを受け取った、RREQを受け取ったけどすでに経路構築されているわけではない、etc
                     // →同一内容（受け取ったpayloadそのまま）で送り返す
                     // ※ここのendpoint.getId()でエラーが出るなら、mPayloadCallbackByDiscovererから
@@ -2015,5 +2003,3 @@ public class MANETManageService extends Service implements
     //TODO: 自端末のMBODを減少させるメソッドが要る？
 
 }
-
-
