@@ -227,13 +227,16 @@ public class MANETManageService extends Service implements
                     mNM.notify(1, builder.build());
 
                     // We're no longer connecting
+                    Log.v(TAG,"mIsConnecting = false");
                     mIsConnecting = false;
 
                     if (!result.getStatus().isSuccess()) {
                         Log.w(TAG,
                                 String.format(
-                                        "Connection failed. Received status"
-                                ));
+                                        "Connection failed. Received status %s.",
+                                        MANETManageService.toString( result.getStatus() )
+                                )
+                        );
                         /** 通知 */
                         builder.setContentText("onConnectionResult: Connection failed.");
                         mNM.notify(1, builder.build());
@@ -571,8 +574,7 @@ public class MANETManageService extends Service implements
                 if(mRouteLists.containsKey( sendingNormalPayload.getSourceAddress() ) ){
                     Log.d(TAG,String.format("onConnectionInitiated: have Source Address in sendingNormalPayload"));
                     //送信元アドレスに関連付けられた経路表の次ホップアドレスは通信相手のアドレスと一致するか？
-                    if(mRouteLists.get( sendingNormalPayload.getSourceAddress() ).getHopAdd()
-                            == endpoint.getName() ){
+                    if(endpoint.getName().equals( mRouteLists.get( sendingNormalPayload.getSourceAddress() ).getHopAdd() ) ){
                         //一致する
                         Log.d(TAG,String.format("onConnectionInitiated: NextHopAddress == endpoint's Address"));
                         // 接続を受け入れる。
@@ -580,6 +582,8 @@ public class MANETManageService extends Service implements
                     }else{
                         //一致しない
                         Log.d(TAG,String.format("onConnectionInitiated: NextHopAddress != endpoint's Address"));
+                        Log.d(TAG,String.format("NextHopAddress = "+ mRouteLists.get( sendingNormalPayload.getSourceAddress() ).getHopAdd() ) );
+                        Log.d(TAG,String.format("NextHopAddress = "+ mRouteLists.get( endpoint.getName() ) ) );
                         rejectConnection(endpoint);
                     }
                 }else{
@@ -663,7 +667,10 @@ public class MANETManageService extends Service implements
                                         //sendPayloadの送信に失敗したとき
                                         Log.w(TAG,
                                                 String.format(
-                                                        "sendPayload failed."));
+                                                        "sendPayload failed. %s",
+                                                        MANETManageService.toString(status)
+                                                )
+                                        );
                                         /** 通知 */
                                         builder.setContentText("onEndpointConnected: sendPayload failed.");
                                         mNM.notify(1, builder.build());
@@ -760,16 +767,23 @@ public class MANETManageService extends Service implements
                         //送るRREPメッセージの送信先シーケンス番号 = Discovererのシーケンス番号
                             //mRouteLists.get( receivedPayload.getST(2) ).getSeqNum()を使えと。
                     }*/
-
-
+                    //TODO:デスティノードに経路表作れ
+                    // RREQにおける経路表構築
+                    // 次ホップアドレス = メッセージを送ってきた相手のアドレス
+                    Log.d(TAG, "onEndpointDisconnected: 送信元=" + receivedPayload.getST(4) );
+                    Log.d(TAG, "onEndpointDisconnected: 次ホップ=" + endpoint.getName() );
+                    mRouteLists.put( receivedPayload.getST(4),
+                            new RouteList(receivedPayload.getST(4),
+                                    parseInt( receivedPayload.getST(5) ) + 1,
+                                    endpoint.getName(),
+                                    3600) );
                     // 受け取ったRREQを基に転送準備
                     // 送信先アドレスと送信元アドレスには、RREQに書かれていたものをコピーする
-
                     //TODO:Discoverer自身のシーケンス番号の設定、Payloadのシーケンス番号設定
                     // 送るRREPメッセージの送信先シーケンス番号 = Discovererのシーケンス番号
                     // ※mRouteLists.get( receivedPayload.getST(2) ).getSeqNum()をシーケンスに代入してnull Pointer出た
                     sendingNormalPayload
-                            = new SendingNormalPayload( receivedPayload.getST(0),
+                            = new SendingNormalPayload( "2",
                             receivedPayload.getST(2),
                             String.valueOf( parseInt(receivedPayload.getST(3) ) + 1 ),
                             receivedPayload.getST(4),
@@ -807,7 +821,9 @@ public class MANETManageService extends Service implements
     @Override
     public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
         Log.d(TAG,"onConnectionFailed(@NonNull ConnectionResult connectionResult)");
-        Log.w(TAG, String.format("onConnectionFailed"));
+        Log.w(TAG, String.format("onConnectionFailed(%s)",
+                MANETManageService.toString(new Status( connectionResult.getErrorCode() ) ) )
+        );
         /** 通知 */
         builder.setContentText("onConnectionFailed(@NonNull ConnectionResult connectionResult)");
         mNM.notify(1, builder.build());
@@ -825,10 +841,11 @@ public class MANETManageService extends Service implements
 
             //１回の接続要求に要した時間が異様に長いか？（8秒以上と仮定）
             if(timeOfConnectToEndPoint != 0 && System.currentTimeMillis()-timeOfConnectToEndPoint > 8000) {
-                Log.d(TAG,"onConnectionFailed(Endpoint endpoint)");
+                /*Log.d(TAG,"onConnectionFailed(Endpoint endpoint)");
                 //１回の接続要求に要した時間が8秒以上の場合、接続先候補から現在の接続先を消去する
                 //※接続先候補が移動して通信圏外に動いた可能性を考慮
                 mDiscoveredEndpoints.remove(endpoint.getId());
+                */
             }
 
             //（接続先候補を削った場合を含めて）DiscoveredEndpointsマップが空ではないか？
@@ -886,8 +903,10 @@ public class MANETManageService extends Service implements
                                     mIsAdvertising = false;
                                     Log.w(TAG,
                                             String.format(
-                                                    "Advertising failed. Received status."
-                                                    ));
+                                                    "Advertising failed. Received status. %s.",
+                                                    MANETManageService.toString( result.getStatus() )
+                                            )
+                                    );
                                     /** 通知 */
                                     builder.setContentText("startAdvertising: Advertising failed.");
                                     mNM.notify(1, builder.build());
@@ -928,7 +947,9 @@ public class MANETManageService extends Service implements
                                 if (!status.isSuccess()) {
                                     Log.w(TAG,
                                             String.format(
-                                                    "acceptConnectionByDiscoverer failed."));
+                                                    "acceptConnectionByDiscoverer failed. %s", MANETManageService.toString(status)
+                                            )
+                                    );
                                     /** 通知 */
                                     builder.setContentText("acceptConnectionByDiscoverer: acceptConnection failed.");
                                     mNM.notify(1, builder.build());
@@ -965,7 +986,9 @@ public class MANETManageService extends Service implements
                                 if (!status.isSuccess()) {
                                     Log.w(TAG,
                                             String.format(
-                                                    "rejectConnection failed."));
+                                                    "rejectConnection failed. %s", MANETManageService.toString(status)
+                                            )
+                                    );
                                     /** 通知 */
                                     builder.setContentText("rejectConnection: rejectConnection failed.");
                                     mNM.notify(1, builder.build());
@@ -1097,9 +1120,15 @@ public class MANETManageService extends Service implements
                             //endpointのメッセージタイプと、自分が直近に送ったメッセージタイプが被っていないか？
                             if(sendingNormalPayload != null
                                     && sendingNormalPayload.getMessageType().equals( endpoint.getMessageType() ) ){
-                                // 被っているのでRequestを行わずDiscoveryを再開する
-                                setDisState(dis_State.NORMAL);
+                                Log.d(TAG,"onEndpointFound: endpoint's messageType == my last messageType");
+                                // 被っているので通信相手候補を見なかったことにする
+                                onEndpointLost(endpointId);
                             }else{
+                                Log.d(TAG,"onEndpointFound: endpoint's messageType = " + endpoint.getMessageType() );
+                                if(sendingNormalPayload != null) {
+                                    Log.d(TAG,"onEndpointFound: my last messageType = " + sendingNormalPayload.getMessageType() );
+                                }
+
                                 switch(endpoint.getMessageType() ){
                                     case "1":
                                         //相手のAdvertiserはRREQを送りたい
@@ -1112,8 +1141,8 @@ public class MANETManageService extends Service implements
                                         }else{
                                             Log.d(TAG,"onEndpointFound: Endpoint = RREQ && RouteList = true");
                                             //通信相手候補のName(MACアドレス)と一致するNextHopを含む経路表を持っている
-                                            // 通信相手候補は無視してDiscoveryを再開する
-                                            setDisState(dis_State.NORMAL);
+                                            // 通信相手候補を見なかったことにする
+                                            onEndpointLost(endpointId);
                                         }
                                         break;
                                     case "2":
@@ -1126,15 +1155,15 @@ public class MANETManageService extends Service implements
                                     default:
                                         Log.d(TAG,"onEndpointFound: Endpoint = Unknown");
                                         //相手のAdvertiserに送りたいメッセージが無いのはおかしい
-                                        // 通信相手候補は無視してDiscoveryを再開する
-                                        setDisState(dis_State.NORMAL);
+                                        // 通信相手候補を見なかったことにする
+                                        onEndpointLost(endpointId);
                                 }//switch(endpoint.getMessageType() )
                             }//if(sendingNormalPayload != null &&
                         }else{
                             Log.d(TAG,"onEndpointFound: ServiceId = false");
                             // ServiceIdが一致していない
-                            // 通信相手候補は無視してDiscoveryを再開する
-                            setDisState(dis_State.NORMAL);
+                            // 通信相手候補を見なかったことにする
+                            onEndpointLost(endpointId);
                         }//if (getServiceId().equals(info.getServiceId() ) )
                     }//public void onEndpointFound(String endpointId, DiscoveredEndpointInfo info)
                     @Override
@@ -1158,8 +1187,8 @@ public class MANETManageService extends Service implements
                                     mIsDiscovering = false;
                                     Log.w(TAG,
                                             String.format(
-                                                    "Discovering failed. Received status "
-                                            ));
+                                                    "Discovering failed. Received status%s.",
+                                                    MANETManageService.toString(status) ));
                                     /** 通知 */
                                     builder.setContentText("DiscoveryOptions: Discovering failed.");
                                     mNM.notify(1, builder.build());
@@ -1210,6 +1239,7 @@ public class MANETManageService extends Service implements
         mNM.notify(1, builder.build());
 
         // 自身が接続試行中であることを設定するため、重複して何度も接続をすることはない。
+        Log.v(TAG,"mIsConnecting = true");
         mIsConnecting = true;
 
         // 接続失敗時に時間的要因での再接続を行わないようにするために、接続要求したタイミングの時刻を記録
@@ -1227,12 +1257,15 @@ public class MANETManageService extends Service implements
                                 if (!status.isSuccess()) {
                                     Log.w(TAG,
                                             String.format(
-                                                    "requestConnection failed."));
+                                                    "requestConnection failed. %s", MANETManageService.toString(status)
+                                            )
+                                    );
 
                                     /** 通知 */
                                     builder.setContentText("connectToEndpoint: requestConnection failed.");
                                     mNM.notify(1, builder.build());
 
+                                    Log.v(TAG,"mIsConnecting = false");
                                     mIsConnecting = false;
                                     onConnectionFailed(endpoint);
                                 }else{
@@ -1580,7 +1613,10 @@ public class MANETManageService extends Service implements
                                                 //sendPayloadの送信に失敗したとき
                                                 Log.w(TAG,
                                                         String.format(
-                                                                "sendPayload failed."));
+                                                                "sendPayload failed. %s",
+                                                                MANETManageService.toString(status)
+                                                        )
+                                                );
                                                 /** 通知 */
                                                 builder.setContentText("onReceiveByDiscoverer: sendPayload failed.");
                                                 mNM.notify(1, builder.build());
@@ -1654,6 +1690,22 @@ public class MANETManageService extends Service implements
      */
     public String getServiceId() {
         return SERVICE_ID;
+    }
+
+    /**
+     * Transforms a {@link Status} into a English-readable message for logging.
+     *
+     * @param status The current status
+     * @return A readable String. eg. [404]File not found.
+     */
+    private static String toString(Status status) {
+        return String.format(
+                Locale.US,
+                "[%d]%s",
+                status.getStatusCode(),
+                status.getStatusMessage() != null
+                        ? status.getStatusMessage()
+                        : ConnectionsStatusCodes.getStatusCodeString(status.getStatusCode()));
     }
 
     /** @return アプリに全ての権限が与えられているならならtrue、そうでないならfalseを返す。 */
