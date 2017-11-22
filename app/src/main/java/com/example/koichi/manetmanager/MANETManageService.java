@@ -4,6 +4,7 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Color;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Binder;
@@ -63,7 +64,18 @@ public class MANETManageService extends Service implements
      * 通知作成用
      */
     private NotificationManager mNM;
-    NotificationCompat.Builder builder = new NotificationCompat.Builder(this);
+    android.support.v4.app.NotificationCompat.Builder builder
+            = new android.support.v4.app.NotificationCompat.Builder(this,"1");
+    android.support.v4.app.NotificationCompat.Builder advBuilder
+            = new android.support.v4.app.NotificationCompat.Builder(this,"2")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("DiscoverState:")
+            .setContentText("null");
+    android.support.v4.app.NotificationCompat.Builder disBuilder
+            = new android.support.v4.app.NotificationCompat.Builder(this,"3")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("AdvertiseState:")
+            .setContentText("null");
 
     /**
      * これらのアクセス許可はNearby Connectionsに接続する前に必要。 {@link
@@ -379,17 +391,17 @@ public class MANETManageService extends Service implements
         /* 通知押下時に、MainActivityのonStartCommandを呼び出すためのintent */
         Intent notificationIntent = new Intent(this, MANETManageService.class).putExtra("RREQ", "true");
         PendingIntent pendingIntent = PendingIntent.getService(this, 0, notificationIntent, 0);
-
-        /** サービスを長持ちさせるために通知を作成する */
-        builder.setContentIntent(pendingIntent);
-        /** setSmallIcon(): 通知のアイコン */
-        builder.setSmallIcon(android.R.drawable.ic_dialog_info);
-        /** setTicker(): 通知到着時に表示する内容（Android5.0以上では効果なし） */
-        //builder.setTicker("準備中");
-        /** setContentTitle(): 通知に表示する1行目 */
-        builder.setContentTitle("MANET Manage working");
-        /** setContentText(): 通知に表示する2行目 */
-        builder.setContentText("onCreate");
+        /**
+         * サービスを長持ちさせるために通知を作成する
+         * setSmallIcon(): 通知のアイコン
+         * setTicker(): 通知到着時に表示する内容（Android5.0以上では効果なし）
+         * setContentTitle(): 通知に表示する1行目
+         * setContentText(): 通知に表示する2行目
+         */
+        builder.setContentIntent(pendingIntent)
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setContentTitle("Social DTN working")
+                .setContentText("onCreate");
         mNM = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         /** 1は通知のID、他の箇所でnotify()を使う際に同じIDを指定すると
          * 複数の通知を表示せず既存の通知を上書きする */
@@ -1269,87 +1281,6 @@ public class MANETManageService extends Service implements
     }
 
     /**
-     * 状態が変わったとき。
-     *
-     * @param state 新しい状態。
-     */
-    private void setState(State state) {
-        Log.d(TAG, "setState");
-
-        /** 通知 */
-        builder.setContentText("setState");
-        mNM.notify(1, builder.build());
-
-        if (mState == state) {
-            //logW("State set to " + state + " but already in that state");
-            Log.d(TAG,"State set to " + state + " but already in that state");
-
-            /** 通知 */
-            builder.setContentText("State set to " + state + " but already in that state");
-            mNM.notify(1, builder.build());
-
-            return;
-        }
-
-        //logD("State set to " + state);
-        Log.d(TAG,"State set to " + state);
-        State oldState = mState;
-        mState = state;
-        onStateChanged(oldState, state);
-    }
-
-    /** @return 現在の状態を返す。 */
-    private State getState() {
-        return mState;
-    }
-
-    /**
-     * ステートが変化した時。
-     *
-     * @param oldState 前の状態。この状態に関連するものはすべて掃除する。
-     * @param newState 新しい状態。この状態のUIを準備する。
-     */
-    private void onStateChanged(State oldState, State newState) {
-        Log.d(TAG, "onStateChanged");
-
-        /** 通知 */
-        builder.setContentText("onStateChanged");
-        mNM.notify(1, builder.build());
-
-        /*if (mCurrentAnimator != null && mCurrentAnimator.isRunning()) {
-         *    mCurrentAnimator.cancel();
-         *}
-         */
-        // Nearby Connectionsを新しい状態に更新する。
-        switch (newState) {
-            case SEARCHING:
-                Log.d(TAG,"state: SEARCHING");
-
-                /** 通知 */
-                builder.setContentText("state: SEARCHING");
-                mNM.notify(2, builder.build());
-
-                //disconnectFromAllEndpoints();
-                //startDiscovering();
-                //startAdvertising();
-                break;
-            case CONNECTED:
-                Log.d(TAG,"state: CONNECTED");
-
-                /** 通知 */
-                builder.setContentText("state: CONNECTED");
-                mNM.notify(2, builder.build());
-
-                stopDiscovering();
-                stopAdvertising();
-                break;
-            default:
-                // no-op
-                break;
-        }
-    }
-
-    /**
      * Discoverに関する状態が変化したとき。
      * @param state 次に変化させるdis_State。
      */
@@ -1390,8 +1321,9 @@ public class MANETManageService extends Service implements
                 Log.d(TAG,"dis_State: STOP");
 
                 //通知
-                builder.setContentText("dis_State: STOP");
-                mNM.notify(2, builder.build());
+                disBuilder.setContentText("STOP")
+                        .setColor( Color.argb(0, 0, 0, 0) );
+                mNM.notify(2, disBuilder.build());
 
                 //disconnectFromAllEndpoints(); //Cトークンの破棄を伝える関数
                 myRole = isMyRole.UNKNOWN;
@@ -1401,8 +1333,9 @@ public class MANETManageService extends Service implements
                 Log.d(TAG,"dis_state: NORMAL");
 
                 // 通知
-                builder.setContentText("dis_state: NORMAL");
-                mNM.notify(2, builder.build());
+                disBuilder.setContentText("NORMAL")
+                        .setColor( Color.argb(125, 0, 0, 255) );
+                mNM.notify(2, disBuilder.build());
 
                 //コミュニティトークンを持っているか確認
                 Log.d(TAG,"TokenId:" + common.getAccountGroup().get(common.getListIndex()).getTokenId() );
@@ -1423,8 +1356,9 @@ public class MANETManageService extends Service implements
                 Log.d(TAG,"dis_state: CONNECTED");
 
                 /** 通知 */
-                builder.setContentText("dis_state: CONNECTED");
-                mNM.notify(2, builder.build());
+                disBuilder.setContentText("CONNECTED")
+                        .setColor( Color.argb(255, 0, 255, 0) );
+                mNM.notify(2, disBuilder.build());
 
                 stopWaitByDiscovering();
                 stopAdvertising();
@@ -1474,8 +1408,9 @@ public class MANETManageService extends Service implements
                 Log.d(TAG,"Adv_State: STOP");
 
                 //通知
-                builder.setContentText("Adv_State: STOP");
-                mNM.notify(3, builder.build());
+                advBuilder.setContentText("STOP")
+                        .setColor( Color.argb(0, 0, 0, 0) );
+                mNM.notify(3, advBuilder.build());
 
                 disconnectFromAllEndpoints();
                 break;
@@ -1483,8 +1418,9 @@ public class MANETManageService extends Service implements
                 Log.d(TAG,"Adv_state: REQUEST");
 
                 // 通知
-                builder.setContentText("Adv_state: REQUEST");
-                mNM.notify(3, builder.build());
+                advBuilder.setContentText("REQUEST")
+                        .setColor( Color.argb(122, 0, 0, 255) );
+                mNM.notify(3, advBuilder.build());
 
                 startAdvertising();
                 break;
@@ -1492,8 +1428,9 @@ public class MANETManageService extends Service implements
                 Log.d(TAG,"Adv_state: REPLY");
 
                 // 通知
-                builder.setContentText("Adv_state: REPLY");
-                mNM.notify(3, builder.build());
+                advBuilder.setContentText("REPLY")
+                        .setColor( Color.argb(122, 0, 0, 255) );
+                mNM.notify(3, advBuilder.build());
 
                 startAdvertising();
                 break;
@@ -1513,8 +1450,9 @@ public class MANETManageService extends Service implements
                 Log.d(TAG,"Adv_state: CONSTRUCTED");
 
                 // 通知
-                builder.setContentText("Adv_state: CONSTRUCTED");
-                mNM.notify(3, builder.build());
+                advBuilder.setContentText("CONSTRUCTED")
+                        .setColor( Color.argb(255, 0, 255, 0) );
+                mNM.notify(3, advBuilder.build());
                 /*
                 stopDiscovering();
                 stopAdvertising();
