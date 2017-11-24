@@ -3,22 +3,17 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
-import android.os.Binder;
 import android.os.IBinder;
 import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
-import android.support.annotation.CallSuper;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.content.ContextCompat;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.app.NotificationCompat;
 import android.util.Log;
 import android.widget.Toast;
 import com.google.android.gms.common.ConnectionResult;
@@ -39,8 +34,6 @@ import com.google.android.gms.nearby.connection.Payload;
 import com.google.android.gms.nearby.connection.PayloadCallback;
 import com.google.android.gms.nearby.connection.PayloadTransferUpdate;
 import com.google.android.gms.nearby.connection.Strategy;
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -51,12 +44,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import java.util.StringTokenizer;
-import java.util.TimerTask;
 
 import static java.lang.Integer.parseInt;
 
-public class MANETManageService extends Service implements
+public class ConnectManageService extends Service implements
         GoogleApiClient.ConnectionCallbacks,
         GoogleApiClient.OnConnectionFailedListener {
 
@@ -190,7 +181,7 @@ public class MANETManageService extends Service implements
      */
     private boolean mIsReceiving = false;
 
-    final static String TAG = "MANETManageService";
+    final static String TAG = "ConnectManageService";
 
     /**
      * DiscovererがAdvertiserを発見した際の、ミリ秒で表される時刻。
@@ -226,7 +217,7 @@ public class MANETManageService extends Service implements
 
                     Endpoint endpoint = new Endpoint(endpointId, connectionInfo.getEndpointName());
                     mPendingConnections.put(endpointId, endpoint);
-                    MANETManageService.this.onConnectionInitiated(endpoint, connectionInfo);
+                    ConnectManageService.this.onConnectionInitiated(endpoint, connectionInfo);
                 }
 
                 /** Initiateした端末同士が互いにrejectかacceptを行った **/
@@ -246,7 +237,7 @@ public class MANETManageService extends Service implements
                         Log.w(TAG,
                                 String.format(
                                         "Connection failed. Received status %s.",
-                                        MANETManageService.toString( result.getStatus() )
+                                        ConnectManageService.toString( result.getStatus() )
                                 )
                         );
                         /** 通知 */
@@ -389,7 +380,7 @@ public class MANETManageService extends Service implements
         }
 
         /* 通知押下時に、MainActivityのonStartCommandを呼び出すためのintent */
-        Intent notificationIntent = new Intent(this, MANETManageService.class).putExtra("RREQ", "true");
+        Intent notificationIntent = new Intent(this, ConnectManageService.class).putExtra("RREQ", "true");
         PendingIntent pendingIntent = PendingIntent.getService(this, 0, notificationIntent, 0);
         /**
          * サービスを長持ちさせるために通知を作成する
@@ -678,7 +669,7 @@ public class MANETManageService extends Service implements
                                         Log.w(TAG,
                                                 String.format(
                                                         "sendPayload failed. %s",
-                                                        MANETManageService.toString(status)
+                                                        ConnectManageService.toString(status)
                                                 )
                                         );
                                         /** 通知 */
@@ -827,7 +818,7 @@ public class MANETManageService extends Service implements
     public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
         Log.d(TAG,"onConnectionFailed(@NonNull ConnectionResult connectionResult)");
         Log.w(TAG, String.format("onConnectionFailed(%s)",
-                MANETManageService.toString(new Status( connectionResult.getErrorCode() ) ) )
+                ConnectManageService.toString(new Status( connectionResult.getErrorCode() ) ) )
         );
         /** 通知 */
         builder.setContentText("onConnectionFailed(@NonNull ConnectionResult connectionResult)");
@@ -909,7 +900,7 @@ public class MANETManageService extends Service implements
                                     Log.w(TAG,
                                             String.format(
                                                     "Advertising failed. Received status. %s.",
-                                                    MANETManageService.toString( result.getStatus() )
+                                                    ConnectManageService.toString( result.getStatus() )
                                             )
                                     );
                                     /** 通知 */
@@ -952,7 +943,7 @@ public class MANETManageService extends Service implements
                                 if (!status.isSuccess()) {
                                     Log.w(TAG,
                                             String.format(
-                                                    "acceptConnectionByDiscoverer failed. %s", MANETManageService.toString(status)
+                                                    "acceptConnectionByDiscoverer failed. %s", ConnectManageService.toString(status)
                                             )
                                     );
                                     /** 通知 */
@@ -991,7 +982,7 @@ public class MANETManageService extends Service implements
                                 if (!status.isSuccess()) {
                                     Log.w(TAG,
                                             String.format(
-                                                    "rejectConnection failed. %s", MANETManageService.toString(status)
+                                                    "rejectConnection failed. %s", ConnectManageService.toString(status)
                                             )
                                     );
                                     /** 通知 */
@@ -1192,7 +1183,7 @@ public class MANETManageService extends Service implements
                                     Log.w(TAG,
                                             String.format(
                                                     "Discovering failed. Received status%s.",
-                                                    MANETManageService.toString(status) ));
+                                                    ConnectManageService.toString(status) ));
                                     /** 通知 */
                                     builder.setContentText("DiscoveryOptions: Discovering failed.");
                                     mNM.notify(1, builder.build());
@@ -1261,7 +1252,7 @@ public class MANETManageService extends Service implements
                                 if (!status.isSuccess()) {
                                     Log.w(TAG,
                                             String.format(
-                                                    "requestConnection failed. %s", MANETManageService.toString(status)
+                                                    "requestConnection failed. %s", ConnectManageService.toString(status)
                                             )
                                     );
 
@@ -1540,7 +1531,7 @@ public class MANETManageService extends Service implements
                                                 Log.w(TAG,
                                                         String.format(
                                                                 "sendPayload failed. %s",
-                                                                MANETManageService.toString(status)
+                                                                ConnectManageService.toString(status)
                                                         )
                                                 );
                                                 /** 通知 */

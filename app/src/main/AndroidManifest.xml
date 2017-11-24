@@ -54,7 +54,7 @@
         </activity>
 
         <service
-            android:name=".MANETManageService"
+            android:name=".ConnectManageService"
             android:enabled="true"
             android:exported="false" />
 

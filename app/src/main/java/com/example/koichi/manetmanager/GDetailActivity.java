@@ -14,8 +14,6 @@ import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -38,11 +36,6 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
-import java.util.StringTokenizer;
-
-import android.app.ActivityManager;
-import android.app.ActivityManager.RunningServiceInfo;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -373,7 +366,7 @@ public class GDetailActivity extends AppCompatActivity {
                                     tv_saddress.setText(group_saddress);
                                 }
 
-                                Intent intent = new Intent(GDetailActivity.this, MANETManageService.class);
+                                Intent intent = new Intent(GDetailActivity.this, ConnectManageService.class);
                                 stopService(intent);
 
                                 // →コミュニティトークンを作成するためのボタンを表示
@@ -534,7 +527,7 @@ public class GDetailActivity extends AppCompatActivity {
                         //設定データへString型でArrayList<Accounts> accountGroupオブジェクトをjson型で記述
                         editor.putBoolean(group_id, false ).apply();
 
-                        stopService(new Intent(getBaseContext(),MANETManageService.class));
+                        stopService(new Intent(getBaseContext(),ConnectManageService.class));
                         readFromFBgroup();
                     }
                 }
@@ -624,8 +617,8 @@ public class GDetailActivity extends AppCompatActivity {
         ArrayList<Accounts> accountList = gson.fromJson(sharedPreferences.getString("accountJson", null), new TypeToken<ArrayList<Accounts>>(){}.getType());
         Log.d(TAG, accountList.get(0).getGroupId(),null);
 
-        // MANETManageService(NearbyConnections)を起動する
-        startService(new Intent(getBaseContext(),MANETManageService.class));
+        // ConnectManageService(NearbyConnections)を起動する
+        startService(new Intent(getBaseContext(),ConnectManageService.class));
     }
 
 }
