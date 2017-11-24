@@ -157,7 +157,7 @@
     <Button
         android:layout_height="wrap_content"
         android:layout_width="wrap_content"
-        android:text="コミュニティトークン作成"
+        android:text="Make C-Token"
         android:id="@+id/btnCreate"
         android:layout_marginTop="15dp"
         android:visibility="gone"
@@ -170,7 +170,7 @@
         android:id="@+id/textView7"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="＜作成オプション＞"
+        android:text="＜Options＞"
         android:textSize="24sp"
         android:layout_marginStart="0dp"
         android:layout_marginTop="5dp"
@@ -187,7 +187,7 @@
         android:id="@+id/textView9"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="電池消費許容:"
+        android:text="Battery consumpt:"
         android:textSize="20sp"
         android:layout_marginStart="0dp"
         android:layout_marginTop="5dp"
@@ -195,7 +195,7 @@
         android:visibility="gone"
         tools:layout_constraintTop_creator="1"
         tools:layout_constraintLeft_creator="1"
-        app:layout_constraintLeft_toLeftOf="@+id/btnCreate"
+        app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/textView7"
         />
 
@@ -213,7 +213,7 @@
     <Button
         android:layout_height="wrap_content"
         android:layout_width="wrap_content"
-        android:text="コミュニティトークン削除"
+        android:text="Delete C-Token"
         android:id="@+id/btnDelete"
         android:layout_marginTop="5dp"
         android:visibility="gone"
@@ -225,7 +225,7 @@
     <Button
         android:layout_height="wrap_content"
         android:layout_width="wrap_content"
-        android:text="端末間通信開始"
+        android:text="Start Ad-hoc"
         android:id="@+id/btnSetNearby"
         android:layout_marginTop="5dp"
         android:visibility="gone"

@@ -147,9 +147,9 @@ public class GDetailActivity extends AppCompatActivity {
             public void onClick(View v) {
                 //確認ダイアログ
                 new AlertDialog.Builder(GDetailActivity.this)
-                        .setTitle("端末間通信開始")
-                        .setMessage("このコミュニティトークンを使用して端末間通信を行います。別のコミュニティトークンを既に使用している場合、上書きされます。")
-                        .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                        .setTitle("Start Ad-hoc")
+                        .setMessage("Social DTN Manager will begin Ad-hoc communication. Old C-Token will be overwritten if you have C-Token.")
+                        .setPositiveButton("Agree", new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
                                 // OK button pressed
@@ -157,7 +157,7 @@ public class GDetailActivity extends AppCompatActivity {
                                 preferToken();
                             }
                         })
-                        .setNegativeButton("Cancel", null)
+                        .setNegativeButton("Disagree", null)
                         .show();
             }
         });
