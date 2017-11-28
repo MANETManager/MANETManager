@@ -181,7 +181,7 @@ public class GDetailActivity extends AppCompatActivity {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
             // 位置情報の取得が許可されているかチェック
             if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                Toast.makeText(GDetailActivity.this, "位置情報の取得は既に許可されています", Toast.LENGTH_SHORT).show();
+                //Toast.makeText(GDetailActivity.this, "Permission of Location is already allowed", Toast.LENGTH_SHORT).show();
                 // 権限があるので次に進む
                 if(posting == true)
                     getFacebookPermission();
@@ -196,7 +196,7 @@ public class GDetailActivity extends AppCompatActivity {
             // Android 6.0以下の場合
         } else {
             // インストール時点で許可されているのでチェックの必要なし
-            Toast.makeText(GDetailActivity.this, "位置情報の取得は既に許可されています(Android 5.0以下です)", Toast.LENGTH_SHORT).show();
+            //Toast.makeText(GDetailActivity.this, "Under Android 5.0", Toast.LENGTH_SHORT).show();
             // 権限があるので次に進む
             if(posting == true)
             {
@@ -220,7 +220,7 @@ public class GDetailActivity extends AppCompatActivity {
                 } else {
                     // ユーザーが許可しなかったとき
                     // 許可されなかったため機能が実行できないことを表示する
-                    Toast.makeText(GDetailActivity.this, "Nearby Connections API利用のためにパーミッション許可が必要です", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(GDetailActivity.this, "Permission of Location is needed", Toast.LENGTH_SHORT).show();
                 }
                 return;
             }
@@ -472,7 +472,7 @@ public class GDetailActivity extends AppCompatActivity {
                             Log.e("MYAPP", "unexpected JSON exception", e);
                         }
                         Log.d(TAG, "postToFB(): " + postid);
-                        Toast.makeText(GDetailActivity.this, "コミュニティトークンを作成しました", Toast.LENGTH_LONG).show();
+                        Toast.makeText(GDetailActivity.this, "Created the Community Token", Toast.LENGTH_LONG).show();
                         //btn_Create.setVisibility(View.GONE);
                         viewOfMaketoken(0);
 
@@ -512,7 +512,7 @@ public class GDetailActivity extends AppCompatActivity {
                         }
                         */
                         Log.d(TAG, "deleteToFB(): " + response.getJSONObject());
-                        Toast.makeText(GDetailActivity.this, "コミュニティトークンを削除しました", Toast.LENGTH_LONG).show();
+                        Toast.makeText(GDetailActivity.this, "Deleted the Community Token", Toast.LENGTH_LONG).show();
                         btn_Delete.setVisibility(View.GONE);
 
                         SharedPreferences sharedPreferences = getSharedPreferences("accounts", Context.MODE_PRIVATE); //インスタンス取得

@@ -59,6 +59,12 @@
             android:exported="false" />
 
         <activity android:name=".AccountSettingActivity"/>
+
+        <activity
+            android:name="CallDialogActivity"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:launchMode="singleInstance">
+        </activity>
     </application>
 
 </manifest>

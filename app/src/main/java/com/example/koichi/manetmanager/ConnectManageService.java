@@ -158,7 +158,7 @@ public class ConnectManageService extends Service implements
 
     private SendingPayload sendingPayload;
 
-    private String messageBuffer;
+    private static String messageBuffer;
 
     /**
      * こちらの端末が、発見された端末にこちらへ接続するよう要求している場合はtrueです。
@@ -204,7 +204,6 @@ public class ConnectManageService extends Service implements
                             String.format(
                                     "onConnectionInitiated(endpointId=%s, endpointName=%s)",
                                     endpointId, connectionInfo.getEndpointName()));
-                    /** 通知 */
                     builder.setContentText("onConnectionInitiated");
                     mNM.notify(1, builder.build());
 
@@ -217,8 +216,6 @@ public class ConnectManageService extends Service implements
                 @Override
                 public void onConnectionResult(String endpointId, ConnectionResolution result) {
                     Log.d(TAG, String.format("onConnectionResponse(endpointId=%s, result=%s)", endpointId, result));
-
-                    /** 通知 */
                     builder.setContentText("onConnectionResponse");
                     mNM.notify(1, builder.build());
 
@@ -233,7 +230,6 @@ public class ConnectManageService extends Service implements
                                         ConnectManageService.toString( result.getStatus() )
                                 )
                         );
-                        /** 通知 */
                         builder.setContentText("onConnectionResult: Connection failed.");
                         mNM.notify(1, builder.build());
 
@@ -248,8 +244,6 @@ public class ConnectManageService extends Service implements
                     Log.d(TAG, "onDisconnected");
                     if (!mEstablishedConnections.containsKey(endpointId)) {
                         Log.w(TAG, "Unexpected disconnection from endpoint " + endpointId);
-
-                        /** 通知 */
                         builder.setContentText("onDisconnected: Unexpected disconnection from endpoint " + endpointId);
                         mNM.notify(1, builder.build());
 
@@ -269,8 +263,6 @@ public class ConnectManageService extends Service implements
                 public void onPayloadReceived(String endpointId, Payload payload) {
                     //相手から送られてきたsendPayload()の中身を受け取る
                     Log.d(TAG, String.format("onPayloadReceivedByDiscoverer(endpointId=%s, payload=%s)", endpointId, payload));
-
-                    /** 通知 */
                     builder.setContentText("onPayloadReceivedByDiscoverer");
                     mNM.notify(1, builder.build());
 
@@ -283,7 +275,6 @@ public class ConnectManageService extends Service implements
                     Log.d(TAG,
                             String.format(
                                     "onPayloadTransferUpdateByDiscoverer(endpointId=%s, update=%s)", endpointId, update));
-                    /** 通知 */
                     builder.setContentText("onPayloadTransferUpdateByDiscoverer");
                     mNM.notify(1, builder.build());
                 }
@@ -299,8 +290,6 @@ public class ConnectManageService extends Service implements
                 public void onPayloadReceived(String endpointId, Payload payload) {
                     //相手から送られてきたsendPayload()の中身を受け取る
                     Log.d(TAG, String.format("onPayloadReceivedByAdvertiser(endpointId=%s, payload=%s)", endpointId, payload));
-
-                    /** 通知 */
                     builder.setContentText("onPayloadReceivedByAdvertiser");
                     mNM.notify(1, builder.build());
 
@@ -312,8 +301,7 @@ public class ConnectManageService extends Service implements
                     Log.d(TAG,
                             String.format(
                                     "onPayloadTransferUpdateByAdvertiser(endpointId=%s, update=%s)", endpointId, update));
-                    /** 通知 */
-                    builder.setContentText("onPayloadTransferUpdatByAdvertisere");
+                    builder.setContentText("onPayloadTransferUpdateByAdvertiser");
                     mNM.notify(1, builder.build());
                 }
             };
@@ -802,11 +790,18 @@ public class ConnectManageService extends Service implements
                         Log.d(TAG,"onEndpointDisconnected: メッセージの中身（textMessage）をダイアログで表示");
                         Log.d(TAG,receivedPayload.getST(0));
                         Log.d(TAG,accountList.get(common.getListIndex()).getSourceAddress());
-                        new AlertDialog.Builder(this)
+
+                        //TODO: サービスからDialogを呼び出せないので専用のActivityに投げる
+                        /*new AlertDialog.Builder(ConnectManageService.this)
                                 .setTitle("TextMessage")
                                 .setMessage( receivedPayload.getST(6) )
                                 .setPositiveButton("OK", null)
-                                .show();
+                                .show();*/
+
+                        Intent i = new Intent(ConnectManageService.this, CallDialogActivity.class);
+                        i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                                .putExtra("textMessage", receivedPayload.getST(6) );
+                        getApplicationContext().startActivity(i);
 
                         // メッセージ受信完了。念のためにAdvertiseを終了する
                         setDisState(dis_State.NORMAL);
@@ -835,17 +830,13 @@ public class ConnectManageService extends Service implements
     public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
         Log.d(TAG,"onConnectionFailed(@NonNull ConnectionResult connectionResult)");
         Log.w(TAG, String.format("onConnectionFailed(%s)",
-                ConnectManageService.toString(new Status( connectionResult.getErrorCode() ) ) )
-        );
-        /** 通知 */
+                ConnectManageService.toString(new Status( connectionResult.getErrorCode() ) ) ) );
         builder.setContentText("onConnectionFailed(@NonNull ConnectionResult connectionResult)");
         mNM.notify(1, builder.build());
     }
 
     protected void onConnectionFailed(Endpoint endpoint) {
         Log.d(TAG,"onConnectionFailed(Endpoint endpoint)");
-
-        /** 通知 */
         builder.setContentText("onConnectionFailed(Endpoint endpoint)");
         mNM.notify(1, builder.build());
 
@@ -953,7 +944,6 @@ public class ConnectManageService extends Service implements
                                                     "acceptConnectionByDiscoverer failed. %s", ConnectManageService.toString(status)
                                             )
                                     );
-                                    /** 通知 */
                                     builder.setContentText("acceptConnectionByDiscoverer: acceptConnection failed.");
                                     mNM.notify(1, builder.build());
                                 }
@@ -972,7 +962,6 @@ public class ConnectManageService extends Service implements
                                     Log.w(TAG,
                                             String.format(
                                                     "acceptConnectionByAdvertiser failed."));
-                                    /** 通知 */
                                     builder.setContentText("acceptConnectionByAdvertiser: acceptConnection failed.");
                                     mNM.notify(1, builder.build());
                                 }
@@ -992,7 +981,6 @@ public class ConnectManageService extends Service implements
                                                     "rejectConnection failed. %s", ConnectManageService.toString(status)
                                             )
                                     );
-                                    /** 通知 */
                                     builder.setContentText("rejectConnection: rejectConnection failed.");
                                     mNM.notify(1, builder.build());
                                 }
@@ -1022,8 +1010,6 @@ public class ConnectManageService extends Service implements
      */
     protected void startWaitByDiscovering() {
         Log.d(TAG,"startWaitByDiscovering");
-
-        /** 通知 */
         builder.setContentText("startWaitByDiscovering");
         mNM.notify(1, builder.build());
 
@@ -1054,7 +1040,7 @@ public class ConnectManageService extends Service implements
                             // endpointのメッセージタイプがRREPかRREQであり、
                             // 尚且つそれが自分が直近に送ったメッセージタイプと被っていないか？
                             if(sendingPayload != null
-                                    && "1".equals( typeBuffer ) || "2".equals( typeBuffer )
+                                    && !"3".equals( typeBuffer )
                                     && sendingPayload.getMessageType().equals( typeBuffer ) ){
                                 Log.d(TAG,"onEndpointFound: endpoint's messageType == my last messageType");
                                 // 被っているので通信相手候補を見なかったことにする
@@ -1138,7 +1124,6 @@ public class ConnectManageService extends Service implements
                                             String.format(
                                                     "Discovering failed. Received status%s.",
                                                     ConnectManageService.toString(status) ));
-                                    /** 通知 */
                                     builder.setContentText("DiscoveryOptions: Discovering failed.");
                                     mNM.notify(1, builder.build());
                                     onDiscoveryFailed();
@@ -1159,8 +1144,6 @@ public class ConnectManageService extends Service implements
 
     protected void disconnectFromAllEndpoints() {
         Log.d(TAG,"disconnectFromAllEndpoints");
-
-        /** 通知 */
         builder.setContentText("disconnectFromAllEndpoints");
         mNM.notify(1, builder.build());
 
@@ -1220,7 +1203,6 @@ public class ConnectManageService extends Service implements
      * @param state 次に変化させるdis_State。
      */
     private void setDisState(dis_State state){
-        /** 通知 */
         builder.setContentText("setDisState");
         mNM.notify(1, builder.build());
 
@@ -1243,8 +1225,6 @@ public class ConnectManageService extends Service implements
      */
     private void onDisStateChanged(dis_State oldState, dis_State newState) {
         Log.d(TAG, "onDisStateChanged");
-
-        /** 通知 */
         builder.setContentText("onDisStateChanged");
         mNM.notify(1, builder.build());
 
@@ -1291,8 +1271,6 @@ public class ConnectManageService extends Service implements
                 break;
             case CONNECTED:
                 Log.d(TAG,"dis_state: CONNECTED");
-
-                /** 通知 */
                 disBuilder.setContentText("CONNECTED")
                         .setColor( Color.argb(255, 0, 255, 0) );
                 mNM.notify(2, disBuilder.build());
@@ -1311,7 +1289,6 @@ public class ConnectManageService extends Service implements
      * @param state 次に変化させるadv_State。
      */
     private void setAdvState(adv_State state){
-        /** 通知 */
         builder.setContentText("setAdvState");
         mNM.notify(1, builder.build());
 
@@ -1362,17 +1339,7 @@ public class ConnectManageService extends Service implements
                 startAdvertising();
                 break;
             case BROKEN:
-                /*
-                Log.d(TAG,"dis_state: NORMAL");
 
-                // 通知
-                builder.setContentText("dis_state: NORMAL");
-                mNM.notify(2, builder.build());
-
-                stopDiscovering();
-                stopAdvertising();
-                break;
-                */
             case CONSTRUCTED:
                 Log.d(TAG,"Adv_state: CONSTRUCTED");
                 advBuilder.setContentText("CONSTRUCTED")
@@ -1738,6 +1705,10 @@ public class ConnectManageService extends Service implements
             // Payloadをbyte型配列へ変換→それを1つのString型に変換
             // →それをカンマで区切ってstring配列の各項目に挿入
             this.st = new String( this.payload.asBytes() ).split(",");
+            if(st.length > 6){
+                Log.d(TAG, "st[6] = exist");
+                messageBuffer = getST(6);
+            }
         }
 
         /* st[num]を返す */
