@@ -1,4 +1,5 @@
 package com.example.koichi.manetmanager;
+import android.app.AlertDialog;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
@@ -60,12 +61,12 @@ public class ConnectManageService extends Service implements
     android.support.v4.app.NotificationCompat.Builder advBuilder
             = new android.support.v4.app.NotificationCompat.Builder(this,"2")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("DiscoverState:")
+            .setContentTitle("AdvertisingState:")
             .setContentText("null");
     android.support.v4.app.NotificationCompat.Builder disBuilder
             = new android.support.v4.app.NotificationCompat.Builder(this,"3")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("AdvertiseState:")
+            .setContentTitle("DiscoveringState:")
             .setContentText("null");
 
     /**
@@ -147,7 +148,7 @@ public class ConnectManageService extends Service implements
 
     /**
      * String型（各経路表の終点ノードアドレスを想定）と関係するRouteList（経路表クラス）のマップ。
-     * 端末が知っている宛先の数だけ、このMapの要素数とRouteListが存在する。はず。
+     * 端末が知っている宛先の数だけ、このMapの要素数とRouteListが存在する。
      */
     private final Map<String, RouteList> mRouteLists = new HashMap<>();
 
@@ -155,7 +156,9 @@ public class ConnectManageService extends Service implements
 
     private ReceivedPayload receivedPayload;
 
-    private SendingNormalPayload sendingNormalPayload;
+    private SendingPayload sendingPayload;
+
+    private String messageBuffer;
 
     /**
      * こちらの端末が、発見された端末にこちらへ接続するよう要求している場合はtrueです。
@@ -182,16 +185,6 @@ public class ConnectManageService extends Service implements
     private boolean mIsReceiving = false;
 
     final static String TAG = "ConnectManageService";
-
-    /**
-     * DiscovererがAdvertiserを発見した際の、ミリ秒で表される時刻。
-     * connectToEndpoint()のNearbyAPIの直前にここへ保存する。
-     * 接続確立に失敗した際にもミリ秒の時刻を計測し、
-     * その差が一定以上（とりあえず8秒以上）である場合、接続の再試行をせずに切断する。
-     * データの入れ違いを防ぐべく通信確立成功時に0を代入し、
-     * 値が0の場合は各種条件分岐が偽になるようにする
-     */
-    private static long timeOfConnectToEndPoint;
 
     /*
      * デスティネーションノードのアドレス、今回の研究では固定値となる
@@ -369,11 +362,9 @@ public class ConnectManageService extends Service implements
         if (hasPermissions(this, getRequiredPermissions() ) ) {
             createGoogleApiClient();
         } else {
-            try
-            {
+            try {
                 throw new Exception ("permission denied");
-            }
-            catch(Exception e) {
+            } catch(Exception e) {
                 e.printStackTrace();
                 Log.e("MYAPP", "unexpected JSON exception", e);
             }
@@ -411,14 +402,22 @@ public class ConnectManageService extends Service implements
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.d(TAG, "onStartCommand");
-
-        /** 通知 */
         builder.setContentText("onStartCommand");
         mNM.notify(1, builder.build());
-
         if("true".equals( intent.getStringExtra("RREQ") ) )
         {
-            createNewMessage();
+            //TODO: 送信する予定のメッセージを入力する画面
+            messageBuffer = "test";
+            //デスティネーションアドレスがKeyの経路表は存在するか？
+            if(mRouteLists.containsKey( mDestinationAddress ) ){
+                //SENDメッセージ送信準備
+                Log.d(TAG, "onStartCommand: mode SEND");
+                createSENDMessage(mDestinationAddress);
+            }else{
+                //経路構築のためにRREQメッセージ送信準備
+                Log.d(TAG, "onStartCommand: mode RREQ");
+                createRREQMessage();
+            }
         }
 
         /** このreturn値によってサービスが停止しても再起動が行われる
@@ -500,82 +499,99 @@ public class ConnectManageService extends Service implements
         // これにより、ユーザーは接続先のデバイスを視覚的に確認できます。
         // mConnectedColor = COLORS[connectionInfo.getAuthenticationToken().hashCode() % COLORS.length];
 
-        //TODO: 共通鍵云々を実装するならばこの辺りか？
+        //TODO: 共通鍵云々を実装するならばこの辺り？
         if(connectionInfo.isIncomingConnection() == false)
         {
             //自分がDiscovererのとき
-            //自端末のMACアドレスをmNameに入れて利用しているはずなので、それを流用する
-            if(mDestinationAddress.equals(mName)){
-                Log.d(TAG, "onConnectionInitiated: I'm Discoverer & Destination Node");
-                /**
-                 * Wi-Fi使って他端末とConnectionInitiatedしてる可能性あるのにどうするの？大丈夫？
-                 * 最悪、今回の研究においては「デスティネーションノード端末は固定」
-                 * として、グローバル変数のMacAddress = MMServiceにおける固定値のアドレス
-                 * ならばその端末がデスティであり、通信切り替えすればアクセスポイントへすぐ接続
-                 * できるものという前提で話を進めるしかない
-                 */
-                //とりあえず以下のソースで拾える"Wi-Fi"が"Wi-Fi Direct"を含まないという前提で
-                //まあNearby実行中にこれが両方Trueになることは無いと思っている
+            //相手が送ろうとしているメッセージがSENDかRERRならすぐに受け入れる
+            switch(endpoint.getMessageType()){
+                case "4":
+                    //経路構築後のメッセージを受信予定
+                    myRole = isMyRole.DELIVER;
+                    acceptConnectionByDiscoverer(endpoint);
+                    break;
+                case "3":
+                    //RERRメッセージ受信予定
+                    myRole = isMyRole.ERROR;
+                    acceptConnectionByDiscoverer(endpoint);
+                    break;
+                default:
+                    //自端末のMACアドレスをmNameに入れて利用しているはずなので、それを流用する
+                    if(mDestinationAddress.equals(mName)){
+                        Log.d(TAG, "onConnectionInitiated: I'm Discoverer & Destination Node");
+                        /**
+                         * Wi-Fi使って他端末とConnectionInitiatedしてる可能性あるのにどうするの？大丈夫？
+                         * 最悪、今回の研究においては「デスティネーションノード端末は固定」
+                         * として、グローバル変数のMacAddress = MMServiceにおける固定値のアドレス
+                         * ならばその端末がデスティであり、通信切り替えすればアクセスポイントへすぐ接続
+                         * できるものという前提で話を進めるしかない
+                         */
+                        //とりあえず以下のソースで拾える"Wi-Fi"が"Wi-Fi Direct"を含まないという前提で
+                        //まあNearby実行中にこれが両方Trueになることは無いと思っている
 
-                ConnectivityManager connectivityManager =
-                        (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
-                //TODO:デスティネーションノードとアクセスポイントのアソシエーションがある／ない
-                //TODO: ↓Wi-Fi Directも"TYPE_WIFI"だと判定してしまう
-                @Nullable NetworkInfo networkInfo = connectivityManager.getActiveNetworkInfo();
-                if (networkInfo != null && networkInfo.getType() == ConnectivityManager.TYPE_WIFI){
-                    Log.d(TAG, "onConnectionInitiated: I'm Discoverer & Destination Node, and have Network");
-                    myRole = isMyRole.DESTIN;
-                    //Wi-Fiでネットワークがアクティブになってる
-                    acceptConnectionByDiscoverer(endpoint);
-                }else{
-                    //それ以外
-                    Log.d(TAG, "onConnectionInitiated: I'm Discoverer & Destination Node, but have no Network");
-                    rejectConnection(endpoint);
-                }
-            }else{
-                ArrayList<Accounts> accountList = common.getAccountGroup();
-                if( mName.equals( accountList.get(common.getListIndex()).getSourceAddress() ) ){
-                    Log.d(TAG, "onConnectionInitiated: I'm Discoverer & Source Node");
-                    //自分がDiscovererかつソースノードのとき
-                    // すぐに接続を受け入れる。
-                    myRole = isMyRole.SOURCE;
-                    acceptConnectionByDiscoverer(endpoint);
-                }else {
-                    Log.d(TAG, "onConnectionInitiated: I'm Discoverer & Relay Node");
-                    //自分がDiscovererかつ中継ノードのとき
-                    /**
-                    * if(中継ノードのGroupID == メッセージ内のGroupID) &&
-                    * if(中継ノードのTokenID == メッセージ内のTokenID)は
-                    * SERVICE_IDが一致し通信確立を行えた時点で成立している
-                    **/
-                    if(common.getMbod() <= 0){
-                        Log.d(TAG, "onConnectionInitiated: I'm Discoverer & Relay Node but have no Mbod");
-                        //グローバル変数のMbod（自端末バッテリー消費許容量の残り）が0かそれ以下
-                        rejectConnection(endpoint);
-                        return;
-                    }else {
-                        Log.d(TAG, "onConnectionInitiated: I'm Discoverer & Relay Node and have enough Mbod");
-                        //メッセージ残量に問題が見られない
-                        myRole = isMyRole.RELAY;
-                        //accept後、メッセージを受け取って解析へ
-                        acceptConnectionByDiscoverer(endpoint);
-                    }
-                }
-            }
+                        ConnectivityManager connectivityManager =
+                                (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+                        //TODO:デスティネーションノードとアクセスポイントのアソシエーションがある／ない
+                        //TODO: ↓Wi-Fi Directも"TYPE_WIFI"だと判定してしまう
+                        @Nullable NetworkInfo networkInfo = connectivityManager.getActiveNetworkInfo();
+                        if (networkInfo != null && networkInfo.getType() == ConnectivityManager.TYPE_WIFI){
+                            Log.d(TAG, "onConnectionInitiated: I'm Discoverer & Destination Node, and have Network");
+                            myRole = isMyRole.DESTIN;
+                            //Wi-Fiでネットワークがアクティブになってる
+                            acceptConnectionByDiscoverer(endpoint);
+                        }else{
+                            //それ以外
+                            Log.d(TAG, "onConnectionInitiated: I'm Discoverer & Destination Node, but have no Network");
+                            rejectConnection(endpoint);
+                        }
+                    }else{
+                        ArrayList<Accounts> accountList = common.getAccountGroup();
+                        if( mName.equals( accountList.get(common.getListIndex()).getSourceAddress() ) ){
+                            Log.d(TAG, "onConnectionInitiated: I'm Discoverer & Source Node");
+                            //自分がDiscovererかつソースノードのとき
+                            // すぐに接続を受け入れる。
+                            myRole = isMyRole.SOURCE;
+                            acceptConnectionByDiscoverer(endpoint);
+                        }else {
+                            Log.d(TAG, "onConnectionInitiated: I'm Discoverer & Relay Node");
+                            //自分がDiscovererかつ中継ノードのとき
+                            /**
+                             * if(中継ノードのGroupID == メッセージ内のGroupID) &&
+                             * if(中継ノードのTokenID == メッセージ内のTokenID)は
+                             * SERVICE_IDが一致し通信確立を行えた時点で成立している
+                             **/
+                            if(common.getMbod() <= 0){
+                                Log.d(TAG, "onConnectionInitiated: I'm Discoverer & Relay Node but have no Mbod");
+                                //グローバル変数のMbod（自端末バッテリー消費許容量の残り）が0かそれ以下
+                                rejectConnection(endpoint);
+                                return;
+                            }else {
+                                Log.d(TAG, "onConnectionInitiated: I'm Discoverer & Relay Node and have enough Mbod");
+                                //メッセージ残量に問題が見られない
+                                myRole = isMyRole.RELAY;
+                                //accept後、メッセージを受け取って解析へ
+                                acceptConnectionByDiscoverer(endpoint);
+                            }//if(common.getMbod() <= 0)
+                        }//if( mName.equals( accountList.get(common.getListIndex()).getSourceAddress() ) )
+                    }//if(mDestinationAddress.equals(mName))
+                    break;
+            }//switch(endpoint.getMessageType())
         }else{
+            //自分がAdvertiser
             Log.d(TAG,String.format("onConnectionInitiated: I'm Advertiser"));
             /*
              * 自分がRREPを送る場合は、相手が送信元アドレスに関する自らの経路表に記された
              * 次ホップアドレスと一致するかを調べる。
              */
             //これから自分が送信するのはRREPか？
-            if( "2".equals(sendingNormalPayload.getMessageType() ) ){
+            if( "2".equals(sendingPayload.getMessageType() ) ){
                 //自分が送るのはRREP
+                //TODO: デバッグ用の長ったらしいif文なのでもう少し綺麗に整理したい
                 //ぬるぽ回避用：そもそも「これから送るpayloadの送信元アドレス」が自分の経路表に含まれるか？
-                if(mRouteLists.containsKey( sendingNormalPayload.getSourceAddress() ) ){
-                    Log.d(TAG,String.format("onConnectionInitiated: have Source Address in sendingNormalPayload"));
+                if(mRouteLists.containsKey( sendingPayload.getSourceAddress() ) ){
+                    Log.d(TAG,String.format("onConnectionInitiated: have Source Address in sendingPayload"));
                     //送信元アドレスに関連付けられた経路表の次ホップアドレスは通信相手のアドレスと一致するか？
-                    if(endpoint.getName().equals( mRouteLists.get( sendingNormalPayload.getSourceAddress() ).getHopAdd() ) ){
+                    if(endpoint.getName().equals( mRouteLists.get( sendingPayload.getSourceAddress() ).getHopAdd() ) ){
                         //一致する
                         Log.d(TAG,String.format("onConnectionInitiated: NextHopAddress == endpoint's Address"));
                         // 接続を受け入れる。
@@ -583,7 +599,7 @@ public class ConnectManageService extends Service implements
                     }else{
                         //一致しない
                         Log.d(TAG,String.format("onConnectionInitiated: NextHopAddress != endpoint's Address"));
-                        Log.d(TAG,String.format("NextHopAddress = "+ mRouteLists.get( sendingNormalPayload.getSourceAddress() ).getHopAdd() ) );
+                        Log.d(TAG,String.format("NextHopAddress = "+ mRouteLists.get( sendingPayload.getSourceAddress() ).getHopAdd() ) );
                         Log.d(TAG,String.format("NextHopAddress = "+ mRouteLists.get( endpoint.getName() ) ) );
                         rejectConnection(endpoint);
                     }
@@ -598,9 +614,9 @@ public class ConnectManageService extends Service implements
                 //自分が送るのはRREP以外
                 // 接続を受け入れる。
                 acceptConnectionByAdvertiser(endpoint);
-            }//if( "2".equals(sendingNormalPayload.getMessageType() ) )ここまで
+            }//if( "2".equals(sendingPayload.getMessageType() ) )ここまで
         }//if(connectionInfo.isIncomingConnection() == false)ここまで
-    }
+    }//protected void onConnectionInitiated(Endpoint endpoint, ConnectionInfo connectionInfo)
 
     private void connectedToEndpoint(Endpoint endpoint) {
         Log.d(TAG,String.format("connectedToEndpoint(endpoint=%s)", endpoint));
@@ -626,39 +642,18 @@ public class ConnectManageService extends Service implements
 
     protected void onEndpointConnected(Endpoint endpoint) {
         Log.d(TAG,String.format("onEndpointConnected(endpoint=%s)", endpoint));
-
-        /** 通知 */
         builder.setContentText("onEndpointConnected");
         mNM.notify(1, builder.build());
-
         Toast.makeText(
                 this, getString(R.string.toast_connected, endpoint.getName()), Toast.LENGTH_SHORT)
                 .show();
-        //setState(State.CONNECTED);
         setDisState(dis_State.CONNECTED);
+        mIsReceiving = false;
 
         //もしもadv_Stateが有効である(STOP以外)
         if(mAdvState != adv_State.STOP){
-            /*
-            //送ろうとしているのがRREQならば
-            if("1".equals( sendingNormalPayload.getMessageType() ) ){
-                //RREQを送るAdvertiserの経路表構築を行う
-                //けどさすがに自分への経路表は作らなくていいから（良心）
-                if( !mName.equals( sendingNormalPayload.getSourceAddress() ) ){
-                    //もしも"自分のアドレス != これから送るRREQの送信元アドレス"なら
-                    //経路表に送信元アドレス,シーケンス番号+1,相手の端末アドレスを追加
-                    mRouteLists.put(sendingNormalPayload.getSourceAddress(),
-                            new RouteList(sendingNormalPayload.getSourceAddress(),
-                                    parseInt( sendingNormalPayload.getSourceSeqNum() ) + 1,
-                                    endpoint.getName(),
-                                    3600
-                            )
-                    );
-                }
-            }
-            */
             //adv_Stateが有効 = 何か送りたいPayloadがあるので、それを送る
-            Nearby.Connections.sendPayload( mGoogleApiClient,endpoint.getId(), sendingNormalPayload.getPayload() )
+            Nearby.Connections.sendPayload( mGoogleApiClient,endpoint.getId(), sendingPayload.getPayload() )
                     .setResultCallback(
                             new ResultCallback<Status>() {
                                 @Override
@@ -672,7 +667,6 @@ public class ConnectManageService extends Service implements
                                                         ConnectManageService.toString(status)
                                                 )
                                         );
-                                        /** 通知 */
                                         builder.setContentText("onEndpointConnected: sendPayload failed.");
                                         mNM.notify(1, builder.build());
                                     }else{
@@ -714,8 +708,8 @@ public class ConnectManageService extends Service implements
 
                         // RREQメッセージを送信するために
                         // 受け取ったRREQを基にPayloadを作成
-                        sendingNormalPayload
-                                = new SendingNormalPayload( receivedPayload.getST(0),
+                        sendingPayload
+                                = new SendingPayload( receivedPayload.getST(0),
                                 receivedPayload.getST(2),
                                 String.valueOf( parseInt(receivedPayload.getST(3) ) + 1 ),
                                 receivedPayload.getST(4),
@@ -739,8 +733,8 @@ public class ConnectManageService extends Service implements
                         // 次ホップのIPアドレス = 自分の経路表に保存されている送信元ノードに関する次ホップアドレス
                         mRouteLists.get( receivedPayload.getST(2) ).addPrecursor( mRouteLists.get( receivedPayload.getST(4) ).getHopAdd() );
                         // 受け取ったRREPを基にPayloadを作成
-                        sendingNormalPayload
-                                = new SendingNormalPayload( receivedPayload.getST(0),
+                        sendingPayload
+                                = new SendingPayload( receivedPayload.getST(0),
                                 receivedPayload.getST(2),
                                 String.valueOf( parseInt(receivedPayload.getST(3) ) + 1 ),
                                 receivedPayload.getST(4),
@@ -756,14 +750,7 @@ public class ConnectManageService extends Service implements
                 case DESTIN:
                     Log.d(TAG, "onEndpointDisconnected: I am DESTINATION Node & received RREQ");
                     //デスティネーションノード、RREQしか受け取らない（はず）
-                    /*※RREQの経路表追加はAdvertiserになって通信相手を見つけた後だよね？
-                    //If(Discovererの（経路表の？）シーケンス番号 ＜ RREQメッセージの送信先シーケンス番号)ならば
-                    if(mRouteLists.get( receivedPayload.getST(2) ).getSeqNum() < parseInt( receivedPayload.getST(3) ) ){
-                        //Discovererのシーケンス番号 = 送信先シーケンス番号
-                        mRouteLists.get( receivedPayload.getST(2) ).setSeqNum( parseInt( receivedPayload.getST(3) ) );
-                        //送るRREPメッセージの送信先シーケンス番号 = Discovererのシーケンス番号
-                            //mRouteLists.get( receivedPayload.getST(2) ).getSeqNum()を使えと。
-                    }*/
+
                     // RREQにおける経路表構築
                     // 次ホップアドレス = メッセージを送ってきた相手のアドレス
                     Log.d(TAG, "onEndpointDisconnected: 送信元=" + receivedPayload.getST(4) );
@@ -778,8 +765,8 @@ public class ConnectManageService extends Service implements
                     //TODO:Discoverer自身のシーケンス番号の設定、Payloadのシーケンス番号設定
                     // 送るRREPメッセージの送信先シーケンス番号 = Discovererのシーケンス番号
                     // ※mRouteLists.get( receivedPayload.getST(2) ).getSeqNum()をシーケンスに代入してnull Pointer出た
-                    sendingNormalPayload
-                            = new SendingNormalPayload( "2",
+                    sendingPayload
+                            = new SendingPayload( "2",
                             receivedPayload.getST(2),
                             String.valueOf( parseInt(receivedPayload.getST(3) ) + 1 ),
                             receivedPayload.getST(4),
@@ -791,18 +778,48 @@ public class ConnectManageService extends Service implements
                 case SOURCE:
                     Log.d(TAG,"onEndpointDisconnected: I am sourceNode & Received RREP");
                     // ソースノード、RREQメッセージは受け取らない（はず）
+                    // RREPにおける経路表構築
+                    // 次ホップアドレス = メッセージを送ってきた相手のアドレス
+                    mRouteLists.put( receivedPayload.getST(2),
+                            new RouteList(receivedPayload.getST(2),
+                                    parseInt( receivedPayload.getST(3) ) + 1,
+                                    endpoint.getName(),
+                                    3600) );
+                    // SENDメッセージを作成する。
+                    createSENDMessage( receivedPayload.st[2] );
+                    break;
+                case DELIVER:
+                    Log.d(TAG,"onEndpointDisconnected: I am DELIVERNode");
+                    ArrayList<Accounts> accountList = common.getAccountGroup();
+                    // SENDメッセージを受け取っている + 自分がソースノードもしくはデスティネーションノードか？
+                    if( receivedPayload != null && receivedPayload.getST(0).equals( "4" )
+                            && mDestinationAddress.equals(mName)
+                            || mName.equals( accountList.get(common.getListIndex()).getSourceAddress() )){
+                        // 自分がSENDメッセージを受け取っているソースノードもしくはデスティネーションノードなので
+                        // メッセージの中身（textMessage）をダイアログで表示
+                        Log.d(TAG,"onEndpointDisconnected: メッセージの中身（textMessage）をダイアログで表示");
+                        Log.d(TAG,receivedPayload.getST(0));
+                        Log.d(TAG,accountList.get(common.getListIndex()).getSourceAddress());
+                        new AlertDialog.Builder(this)
+                                .setTitle("TextMessage")
+                                .setMessage( receivedPayload.getST(6) )
+                                .setPositiveButton("OK", null)
+                                .show();
 
-                    // おそらくRREPメッセージを受け取っているので、
-                    // 経路構築状態（実データ送受信）へ移行してデータ通信を開始する。
-                    setAdvState(adv_State.CONSTRUCTED);
+                        // メッセージ受信完了。念のためにAdvertiseを終了する
+                        setAdvState(adv_State.STOP);
+                    }else{
+                        // SENDメッセージを作成する。
+                        createSENDMessage( receivedPayload.st[2] );
+                    }
                     break;
                 default:
-                    Log.d(TAG,"onEndpointDisconnected: cannot understand myRole:" + myRole );
+                    Log.e(TAG,"onEndpointDisconnected: fatal exception (cannot understand myRole:" + myRole + ")" );
                     // ここに来るのはエラーかAdvertiser？
             }
         }else{
             //mIsReceiving = false
-            Log.d(TAG, "onEndpointDisconnected: mIsReceiving = false");
+            Log.e(TAG, "onEndpointDisconnected: mIsReceiving = false");
         }
 
         Toast.makeText(
@@ -834,16 +851,6 @@ public class ConnectManageService extends Service implements
 
         //依然探索状態であるか？（Discoverができない状況なら再試行する必要がない）
         if (getDisState() != dis_State.STOP) {
-
-            //１回の接続要求に要した時間が異様に長いか？（8秒以上と仮定）
-            if(timeOfConnectToEndPoint != 0 && System.currentTimeMillis()-timeOfConnectToEndPoint > 8000) {
-                /*Log.d(TAG,"onConnectionFailed(Endpoint endpoint)");
-                //１回の接続要求に要した時間が8秒以上の場合、接続先候補から現在の接続先を消去する
-                //※接続先候補が移動して通信圏外に動いた可能性を考慮
-                mDiscoveredEndpoints.remove(endpoint.getId());
-                */
-            }
-
             //（接続先候補を削った場合を含めて）DiscoveredEndpointsマップが空ではないか？
             if(!getDiscoveredEndpoints().isEmpty()) {
                 //DiscoveredEndpoints（接続先候補）からランダムに抽出して再試行
@@ -876,15 +883,12 @@ public class ConnectManageService extends Service implements
      */
     protected void startAdvertising() {
         Log.d(TAG,"startAdvertising");
-
-        /** 通知 */
         builder.setContentText("startAdvertising");
         mNM.notify(1, builder.build());
-
         mIsAdvertising = true;
         Nearby.Connections.startAdvertising(
                 mGoogleApiClient,
-                getName() + "," + sendingNormalPayload.getMessageType(),
+                getName() + "," + sendingPayload.getMessageType(),
                 getServiceId(),
                 mConnectionLifecycleCallback,
                 new AdvertisingOptions(STRATEGY))
@@ -903,7 +907,6 @@ public class ConnectManageService extends Service implements
                                                     ConnectManageService.toString( result.getStatus() )
                                             )
                                     );
-                                    /** 通知 */
                                     builder.setContentText("startAdvertising: Advertising failed.");
                                     mNM.notify(1, builder.build());
                                     onAdvertisingFailed();
@@ -994,67 +997,6 @@ public class ConnectManageService extends Service implements
     }
 
     /**
-     * デバイスをDiscoverモードに設定する。それにより、Advertiseモードの端末を待つ。このモードに成功
-     * すると、{@link #onDiscoveryStarted()} ()} または {@link #onDiscoveryFailed()} ()} の
-     * いずれかが呼び出される。
-     * 　※ 未使用
-     */
-    /*protected void startDiscovering() {
-        Log.d(TAG,"startDiscovering");
-
-        builder.setContentText("startDiscovering");
-        mNM.notify(1, builder.build());
-
-        mIsDiscovering = true;
-        mDiscoveredEndpoints.clear();
-        Nearby.Connections.startDiscovery(
-                mGoogleApiClient,
-                getServiceId(),
-                new EndpointDiscoveryCallback() {
-                    @Override
-                    public void onEndpointFound(String endpointId, DiscoveredEndpointInfo info) {
-                        Log.d(TAG,
-                                String.format(
-                                        "onEndpointFound(endpointId=%s, serviceId=%s, endpointName=%s)",
-                                        endpointId, info.getServiceId(), info.getEndpointName()));
-
-                        if (getServiceId().equals(info.getServiceId())) {
-                            Endpoint endpoint = new Endpoint(endpointId, info.getEndpointName());
-                            mDiscoveredEndpoints.put(endpointId, endpoint);
-                            onEndpointDiscovered(endpoint);
-                        }
-                    }
-
-                    @Override
-                    public void onEndpointLost(String endpointId) {
-                        Log.d(TAG,String.format("onEndpointLost(endpointId=%s)", endpointId));
-                        builder.setContentText("onEndpointLost");
-                        mNM.notify(1, builder.build());
-                    }
-                },
-                new DiscoveryOptions(STRATEGY))
-                .setResultCallback(
-                        new ResultCallback<Status>() {
-                            @Override
-                            public void onResult(@NonNull Status status) {
-                                if (status.isSuccess()) {
-                                    onDiscoveryStarted();
-                                } else {
-                                    mIsDiscovering = false;
-                                    Log.w(TAG,
-                                            String.format(
-                                                    "Discovering failed. Received status "
-                                            ));
-                                    builder.setContentText("DiscoveryOptions: Discovering failed.");
-                                    mNM.notify(1, builder.build());
-
-                                    onDiscoveryFailed();
-                                }
-                            }
-                        });
-    }*/
-
-    /**
      * Discoverモードを停止する。
      * startWaitByDiscovering()もこちらで止められる。
      */
@@ -1071,7 +1013,6 @@ public class ConnectManageService extends Service implements
     /** Discoverモードが正常に開始した。このメソッドをオーバーライドして、イベントを処理する。 */
     protected void onDiscoveryStarted() {
         Log.d(TAG,"onDiscoveryStarted");
-        timeOfConnectToEndPoint = 0; //値が0の場合は条件分岐が偽になるようにする
     }
 
     /** Discoveryモードの開始に失敗した。このメソッドをオーバーライドして、イベントを処理する。 */
@@ -1110,34 +1051,39 @@ public class ConnectManageService extends Service implements
                         if (getServiceId().equals(info.getServiceId() ) ){
                             // ServiceIdが一致している
                             Log.d(TAG,"onEndpointFound: ServiceId = true");
+
                             // メッセージタイプ取得準備
                             Endpoint endpoint = new Endpoint(endpointId, info.getEndpointName());
-                            //endpointのメッセージタイプと、自分が直近に送ったメッセージタイプが被っていないか？
-                            if(sendingNormalPayload != null
-                                    && sendingNormalPayload.getMessageType().equals( endpoint.getMessageType() ) ){
+                            String typeBuffer = endpoint.getMessageType();
+
+                            // endpointのメッセージタイプがRREPかRREQであり、
+                            // 尚且つそれが自分が直近に送ったメッセージタイプと被っていないか？
+                            if(sendingPayload != null
+                                    && "1".equals( typeBuffer ) || "2".equals( typeBuffer )
+                                    && sendingPayload.getMessageType().equals( typeBuffer ) ){
                                 Log.d(TAG,"onEndpointFound: endpoint's messageType == my last messageType");
                                 // 被っているので通信相手候補を見なかったことにする
                                 onEndpointLost(endpointId);
                             }else{
                                 Log.d(TAG,"onEndpointFound: endpoint's messageType = " + endpoint.getMessageType() );
-                                if(sendingNormalPayload != null) {
-                                    Log.d(TAG,"onEndpointFound: my last messageType = " + sendingNormalPayload.getMessageType() );
+                                if(sendingPayload != null) {
+                                    Log.d(TAG,"onEndpointFound: my last messageType = " + sendingPayload.getMessageType() );
                                 }
-
                                 switch(endpoint.getMessageType() ){
                                     case "1":
+                                        Log.d(TAG,"onEndpointFound: Endpoint = RREQ");
                                         //相手のAdvertiserはRREQを送りたい
                                         // 通信相手候補のName(MACアドレス)と一致するNextHopを含む経路表を自分は持っているか？
-                                        if( !isRouteMapHaveNextHopAdd(mRouteLists,info.getEndpointName() ) ) {
-                                            Log.d(TAG,"onEndpointFound: Endpoint = RREQ && RouteList = false");
-                                            //通信相手候補のName(MACアドレス)と一致するNextHopを含む経路表を持っていない
-                                            mDiscoveredEndpoints.put(endpointId, endpoint);
-                                            onEndpointDiscovered(endpoint);
-                                        }else{
-                                            Log.d(TAG,"onEndpointFound: Endpoint = RREQ && RouteList = true");
+                                        if( isRouteMapHaveNextHopAdd(mRouteLists,info.getEndpointName() ) ) {
+                                            Log.d(TAG,"RouteList = true");
                                             //通信相手候補のName(MACアドレス)と一致するNextHopを含む経路表を持っている
                                             // 通信相手候補を見なかったことにする
                                             onEndpointLost(endpointId);
+                                        }else{
+                                            Log.d(TAG,"RouteList = false");
+                                            //通信相手候補のName(MACアドレス)と一致するNextHopを含む経路表を持っていない
+                                            mDiscoveredEndpoints.put(endpointId, endpoint);
+                                            onEndpointDiscovered(endpoint);
                                         }
                                         break;
                                     case "2":
@@ -1147,13 +1093,28 @@ public class ConnectManageService extends Service implements
                                         mDiscoveredEndpoints.put(endpointId, endpoint);
                                         onEndpointDiscovered(endpoint);
                                         break;
+                                    case "4":
+                                        // 相手のAdvertiserはとSENDメッセージを送りたい
+                                        // 通信相手候補のName(MACアドレス)と一致するNextHopを含む経路表を自分は持っているか？
+                                        if( isRouteMapHaveNextHopAdd(mRouteLists,info.getEndpointName() ) ) {
+                                            Log.d(TAG,"onEndpointFound: Endpoint = RREQ && RouteList = true");
+                                            // 通信相手候補のName(MACアドレス)と一致するNextHopを含む経路表を持っている
+                                            mDiscoveredEndpoints.put(endpointId, endpoint);
+                                            onEndpointDiscovered(endpoint);
+                                        }else{
+                                            Log.d(TAG,"onEndpointFound: Endpoint = RREQ && RouteList = false");
+                                            // 通信相手候補のName(MACアドレス)と一致するNextHopを含む経路表を持っていない
+                                            // 通信相手候補を見なかったことにする
+                                            onEndpointLost(endpointId);
+                                        }
+                                        break;
                                     default:
                                         Log.d(TAG,"onEndpointFound: Endpoint = Unknown");
                                         //相手のAdvertiserに送りたいメッセージが無いのはおかしい
                                         // 通信相手候補を見なかったことにする
                                         onEndpointLost(endpointId);
                                 }//switch(endpoint.getMessageType() )
-                            }//if(sendingNormalPayload != null &&
+                            }//if(sendingPayload != null &&
                         }else{
                             Log.d(TAG,"onEndpointFound: ServiceId = false");
                             // ServiceIdが一致していない
@@ -1163,9 +1124,7 @@ public class ConnectManageService extends Service implements
                     }//public void onEndpointFound(String endpointId, DiscoveredEndpointInfo info)
                     @Override
                     public void onEndpointLost(String endpointId) {
-                        Log.d(TAG,String.format("onEndpointLost(endpointId=%s)", endpointId));
-
-                        /** 通知 */
+                        Log.w(TAG,String.format("onEndpointLost(endpointId=%s)", endpointId));
                         builder.setContentText("onEndpointLost");
                         mNM.notify(1, builder.build());
                     }
@@ -1222,23 +1181,17 @@ public class ConnectManageService extends Service implements
         // P2P_STAR は1つの発信接続のみを許可する。
         if (mIsConnecting) {
             // 何かしようと思ったけど、既に見つけた相手は履歴MAPに登録済みだし
-            // メッセージの送信は接続確立後だからメッセージをストックする必要もない（できない）
+            // メッセージの送信は接続確立後だからメッセージをストックする必要もない（できない）場合
             Log.w(TAG,"Already connecting, so ignoring this endpoint: " + endpoint);
             return;
         }
-
         Log.v(TAG,"Sending a connection request to endpoint " + endpoint);
-
-        /** 通知 */
         builder.setContentText("connectToEndpoint: Sending a connection request to endpoint " + endpoint);
         mNM.notify(1, builder.build());
 
         // 自身が接続試行中であることを設定するため、重複して何度も接続をすることはない。
         Log.v(TAG,"mIsConnecting = true");
         mIsConnecting = true;
-
-        // 接続失敗時に時間的要因での再接続を行わないようにするために、接続要求したタイミングの時刻を記録
-        timeOfConnectToEndPoint = System.currentTimeMillis();
 
         // Nearby Connections APIによる正式な接続要求
         // 接続が確立できた場合はmConnectionLifecycleCallbackへ
@@ -1255,17 +1208,13 @@ public class ConnectManageService extends Service implements
                                                     "requestConnection failed. %s", ConnectManageService.toString(status)
                                             )
                                     );
-
-                                    /** 通知 */
                                     builder.setContentText("connectToEndpoint: requestConnection failed.");
                                     mNM.notify(1, builder.build());
-
                                     Log.v(TAG,"mIsConnecting = false");
                                     mIsConnecting = false;
                                     onConnectionFailed(endpoint);
                                 }else{
-                                    /** 接続に成功した場合のはず **/
-
+                                    /** 接続に成功した場合 **/
                                 }
                             }
                         });
@@ -1304,19 +1253,17 @@ public class ConnectManageService extends Service implements
         builder.setContentText("onDisStateChanged");
         mNM.notify(1, builder.build());
 
-        // Nearby Connectionsを新しい状態に更新する。
         switch (newState) {
             case STOP:
                 //TODO: STOPになっていてサービス起動中にコミュニティトークン取得した場合
                 //どうやって復帰すればいいの？
                 Log.d(TAG,"dis_State: STOP");
-
                 //通知
                 disBuilder.setContentText("STOP")
                         .setColor( Color.argb(0, 0, 0, 0) );
                 mNM.notify(2, disBuilder.build());
 
-                //disconnectFromAllEndpoints(); //Cトークンの破棄を伝える関数
+                disconnectFromAllEndpoints(); //Cトークンの破棄を伝える関数
                 myRole = isMyRole.UNKNOWN;
                 stopDiscovering();
                 break;
@@ -1388,41 +1335,31 @@ public class ConnectManageService extends Service implements
      */
     private void onAdvStateChanged(adv_State oldState, adv_State newState) {
         Log.d(TAG, "onAdvStateChanged");
-
-        /** 通知 */
         builder.setContentText("onAdvStateChanged");
         mNM.notify(1, builder.build());
 
-        // Nearby Connectionsを新しい状態に更新する。
+        // Adv_Stateに関する通知を切り替え、
         switch (newState) {
             case STOP:
                 Log.d(TAG,"Adv_State: STOP");
-
-                //通知
                 advBuilder.setContentText("STOP")
                         .setColor( Color.argb(0, 0, 0, 0) );
                 mNM.notify(3, advBuilder.build());
-
                 disconnectFromAllEndpoints();
+                stopAdvertising();
                 break;
             case REQUEST:
                 Log.d(TAG,"Adv_state: REQUEST");
-
-                // 通知
                 advBuilder.setContentText("REQUEST")
                         .setColor( Color.argb(122, 0, 0, 255) );
                 mNM.notify(3, advBuilder.build());
-
                 startAdvertising();
                 break;
             case REPLY:
                 Log.d(TAG,"Adv_state: REPLY");
-
-                // 通知
                 advBuilder.setContentText("REPLY")
                         .setColor( Color.argb(122, 0, 0, 255) );
                 mNM.notify(3, advBuilder.build());
-
                 startAdvertising();
                 break;
             case BROKEN:
@@ -1439,16 +1376,10 @@ public class ConnectManageService extends Service implements
                 */
             case CONSTRUCTED:
                 Log.d(TAG,"Adv_state: CONSTRUCTED");
-
-                // 通知
                 advBuilder.setContentText("CONSTRUCTED")
                         .setColor( Color.argb(255, 0, 255, 0) );
                 mNM.notify(3, advBuilder.build());
-                /*
-                stopDiscovering();
-                stopAdvertising();
-                break;
-                */
+                startAdvertising();
             default:
                 // no-op
                 break;
@@ -1513,56 +1444,44 @@ public class ConnectManageService extends Service implements
                     if(mRouteLists.get(receivedPayload.getST(2)).getSeqNum() >= parseInt(receivedPayload.getST(3)) ){
                         Log.d(TAG, "onPayloadReceivedByDiscoverer: RREQの終点アドレスへの経路表を持っている");
                         //TODO: 受け取ったRREQを基にしたRREPメッセージを送り返す
+                        break;
                     }
-                }else{
-                    Log.d(TAG, "onPayloadReceivedByDiscoverer: message will be replied");
-                    // RREPを受け取った、RREQを受け取ったけどすでに経路構築されているわけではない、etc
-                    // →同一内容（受け取ったpayloadそのまま）で送り返す
-                    // ※ここのendpoint.getId()でエラーが出るなら、mPayloadCallbackByDiscovererから
-                    // endpointIdもらったほうがいい
-                    Nearby.Connections.sendPayload(mGoogleApiClient,endpoint.getId(),payload)
-                            .setResultCallback(
-                                    new ResultCallback<Status>() {
-                                        @Override
-                                        public void onResult(@NonNull Status status) {
-                                            if (!status.isSuccess()) {
-                                                Log.d(TAG, "Nearby.Connections.sendPayload: mIsReceiving = false");
-                                                //sendPayloadの送信に失敗したとき
-                                                Log.w(TAG,
-                                                        String.format(
-                                                                "sendPayload failed. %s",
-                                                                ConnectManageService.toString(status)
-                                                        )
-                                                );
-                                                /** 通知 */
-                                                builder.setContentText("onReceiveByDiscoverer: sendPayload failed.");
-                                                mNM.notify(1, builder.build());
-                                            }else{
-                                                Log.d(TAG, "Nearby.Connections.sendPayload: mIsReceiving = true");
-                                                //sendPayloadの送信に成功したとき
-                                                mIsReceiving = true;
-                                                // この後、Advertiserがこちらの送信に反応して切断するまで待機
-                                            }
-                                        }
-                                    });
                 }
+                //これ以降はSENDメッセージと同様の動作のため、breakしない
+            case "4":
+                Log.d(TAG, "onPayloadReceivedByDiscoverer: message will be replied");
+                // SENDメッセージを受信 → Payloadをそのまま送り返す
+                Nearby.Connections.sendPayload(mGoogleApiClient,endpoint.getId(),payload)
+                        .setResultCallback(
+                                new ResultCallback<Status>() {
+                                    @Override
+                                    public void onResult(@NonNull Status status) {
+                                        if (!status.isSuccess()) {
+                                            Log.d(TAG, "Nearby.Connections.sendPayload: mIsReceiving = false");
+                                            //sendPayloadの送信に失敗したとき
+                                            Log.w(TAG,
+                                                    String.format(
+                                                            "sendPayload failed. %s",
+                                                            ConnectManageService.toString(status)
+                                                    )
+                                            );
+                                            builder.setContentText("onReceiveByDiscoverer: sendPayload failed.");
+                                            mNM.notify(1, builder.build());
+                                        }else{
+                                            Log.d(TAG, "Nearby.Connections.sendPayload: mIsReceiving = true");
+                                            //sendPayloadの送信に成功したとき
+                                            mIsReceiving = true;
+                                            // この後、Advertiserがこちらの送信に反応して切断するまで待機
+                                        }
+                                    }
+                                });
                 break;
             case "3":
                 //TODO: RERRメッセージだと分かった場合
-
-                break;
-            case "4":
-                //TODO: 実通信メッセージだと分かった場合
-                //※保険として確保
-
-                break;
-            case "ping":
-                //TODO: pingメッセージ（デバッグ用）
-
                 break;
             default:
-                //TODO: fatal exception(全く関係なさそうなメッセージが飛んできた)
-
+                //fatal exception(全く関係なさそうなメッセージが飛んできた)
+                Log.e(TAG, String.format("onReceiveByDiscoverer: fatal exception (Unknown messageType)") );
         }
     }
 
@@ -1570,12 +1489,12 @@ public class ConnectManageService extends Service implements
         Log.d(TAG, "onReceiveByAdvertiser");
         //自分からメッセージ送信済か？
         if(mIsReceiving = true){
-            String messageStr = new String( sendingNormalPayload.getPayload().asBytes() ); // Payloadをbyte型配列経由でString型に変換
+            String messageStr = new String( sendingPayload.getPayload().asBytes() ); // Payloadをbyte型配列経由でString型に変換
             String payloadStr = new String( payload.asBytes() ); // Payloadをbyte型配列経由でString型に変換
             //その中身は自分が送ったものと一致するか？
             if(messageStr.equals(payloadStr)) {
                 //送ったメッセージと送り返されたメッセージとが一致すると判明したら、通信を切断する
-                Log.d(TAG, "onReceiveByAdvertiser: sendingNormalPayload == (received)payload");
+                Log.d(TAG, "onReceiveByAdvertiser: sendingPayload == (received)payload");
                 setAdvState(adv_State.STOP); //Advertiseは次に送るべきものが出てくるまで終了
                 setDisState(dis_State.NORMAL); //Discoverを始める
 
@@ -1586,10 +1505,10 @@ public class ConnectManageService extends Service implements
                 // （Discoverer／RREP受け取った側のアドレス）を追加する（RERRメッセージ送信用に利用する）
             }else{
                 //送ったメールと送り返されたメッセージとが一致しない
-                Log.d(TAG, "onReceiveByAdvertiser: sendingNormalPayload != (received)payload");
+                Log.w(TAG, "onReceiveByAdvertiser: sendingPayload != (received)payload");
             }
         }else{
-            Log.d(TAG, "onReceiveByAdvertiser: mIsReceiving != false");
+            Log.w(TAG, "onReceiveByAdvertiser: mIsReceiving != false");
         }
     }
 
@@ -1683,7 +1602,9 @@ public class ConnectManageService extends Service implements
         UNKNOWN,
         SOURCE,
         RELAY,
-        DESTIN
+        DESTIN,
+        DELIVER,
+        ERROR
     }
 
     /** 通話できる（データの送受信ができる）デバイスを表します。 */
@@ -1807,6 +1728,8 @@ public class ConnectManageService extends Service implements
          * st[3] = (string) 終点シーケンス番号
          * st[4] = (string) 送信元アドレス（RREQの作成者）
          * st[5] = (string) 送信元シーケンス番号
+         * SENDの場合、追加で
+         * st[6] = (string) 送信するText
          **/
 
         /* 最初にpayloadを処理しておく */
@@ -1821,14 +1744,18 @@ public class ConnectManageService extends Service implements
         private String getST(int num){return st[num];}
     }
 
-    protected static class SendingNormalPayload {
+    protected static class SendingPayload {
+        //メッセージを入れるPayload
         private Payload payload;
-        private String messageType;
-        private String endNodeAddress;
-        private String endSeqNum;
-        private String sourceAddress;
-        private String sourceSeqNum;
+
+        //メッセージの中身
+        @NonNull private String messageType;
         private String RREQ_ID = "1";
+        @NonNull private String endNodeAddress;
+        private String endSeqNum;
+        @NonNull private String sourceAddress;
+        private String sourceSeqNum;
+        private String sendText;
 
         /**
          * RREQ/RREPの場合
@@ -1841,7 +1768,7 @@ public class ConnectManageService extends Service implements
          **/
 
         /* 最初にpayloadを処理しておく */
-        private SendingNormalPayload(String messageType, String endNodeAddress, String endSeqNum, String sourceAddress, String sourceSeqNum) {
+        private SendingPayload(String messageType, String endNodeAddress, String endSeqNum, String sourceAddress, String sourceSeqNum) {
             this.messageType = messageType;
             this.endNodeAddress = endNodeAddress;
             this.endSeqNum = endSeqNum;
@@ -1858,12 +1785,27 @@ public class ConnectManageService extends Service implements
             this.payload = Payload.fromBytes(message_byte);
         }
 
+        /* SENDメッセージにおいてStringを送信する場合 */
+        private SendingPayload(String messageType, String endNodeAddress, String endSeqNum, String sourceAddress, String sourceSeqNum, String sendText) {
+            this.messageType = messageType;
+            this.endNodeAddress = endNodeAddress;
+            this.endSeqNum = endSeqNum;
+            this.sourceAddress = sourceAddress;
+            this.sourceSeqNum = sourceSeqNum;
+            this.sendText = sendText;
+
+            // Payloadを作成
+            String message_str = this.messageType + "," + RREQ_ID + ","
+                    + this.endNodeAddress + "," + this.endSeqNum + "," + this.sourceAddress
+                    + "," + this.sourceSeqNum + "," + this.sendText;
+            byte[] message_byte = message_str.getBytes();
+            this.payload = Payload.fromBytes(message_byte);
+        }
+
         /* payloadを返す */
         private Payload getPayload() {return this.payload;}
-
         /* messageTypeを返す */
         private String getMessageType() {return this.messageType;}
-
         /* 送信元アドレスを返す */
         private String getSourceAddress(){return this.sourceAddress;}
         /* 送信元シーケンス番号を返す */
@@ -1879,22 +1821,12 @@ public class ConnectManageService extends Service implements
         return name;
     }
 
-    public void createNewMessage(){
-        // RREQメッセージを新規作成して送信する
-        /**
-         * RREQ/RREPの場合
-         * st[0] = (string) messageType
-         * st[1] = (string) RREQ ID
-         * st[2] = (string) 終点アドレス（RREQの宛先）
-         * st[3] = (string) 終点シーケンス番号
-         * st[4] = (string) 送信元アドレス（RREQの作成者）
-         * st[5] = (string) 送信元シーケンス番号
-         **/
-
+    // onStartCommand()メソッドによるRREQ新規作成時のメソッド
+    public void createRREQMessage(){
         //TODO: 終点シーケンス番号に経路表の番号があれば代入する
         //送信元シーケンス番号に端末のシーケンス番号を代入する
-        sendingNormalPayload
-                = new SendingNormalPayload( "1",
+        sendingPayload
+                = new SendingPayload( "1",
                 mDestinationAddress,
                 "0",
                 mName,
@@ -1902,6 +1834,15 @@ public class ConnectManageService extends Service implements
         );
         // 経路探索-要求状態へ移行
         setAdvState(adv_State.REQUEST);
+    }
+
+    // onStartCommand()メソッドなどによるSEND新規作成時のメソッド
+    public void createSENDMessage(String targetAddress){
+        sendingPayload
+                = new SendingPayload( "4", targetAddress,"0",
+                mName,"1", messageBuffer );
+        // 経路構築完了状態へ移行
+        setAdvState(adv_State.CONSTRUCTED);
     }
 
     /*
