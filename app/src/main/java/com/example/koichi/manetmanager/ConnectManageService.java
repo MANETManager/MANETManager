@@ -359,6 +359,7 @@ public class ConnectManageService extends Service implements
         }
 
         /* 通知押下時に、MainActivityのonStartCommandを呼び出すためのintent */
+        //TODO CallPutStrを先に呼び出す
         Intent notificationIntent = new Intent(this, ConnectManageService.class).putExtra("RREQ", "true");
         PendingIntent pendingIntent = PendingIntent.getService(this, 0, notificationIntent, 0);
         /**
@@ -395,6 +396,7 @@ public class ConnectManageService extends Service implements
         if("true".equals( intent.getStringExtra("RREQ") ) )
         {
             //TODO: 送信する予定のメッセージを入力する画面
+            //TODO: "textMessage"インテントを受け取る
             messageBuffer = "test";
             //デスティネーションアドレスがKeyの経路表は存在するか？
             if(mRouteLists.containsKey( mDestinationAddress ) ){
