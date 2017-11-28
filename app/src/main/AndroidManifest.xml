@@ -65,6 +65,12 @@
             android:theme="@android:style/Theme.Translucent.NoTitleBar"
             android:launchMode="singleInstance">
         </activity>
+
+        <activity
+            android:name=".CallPutStrDialogActivity"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:launchMode="singleInstance">
+        </activity>
     </application>
 
 </manifest>

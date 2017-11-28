@@ -359,8 +359,8 @@ public class ConnectManageService extends Service implements
         }
 
         /* 通知押下時に、MainActivityのonStartCommandを呼び出すためのintent */
-        //TODO CallPutStrを先に呼び出す
-        Intent notificationIntent = new Intent(this, ConnectManageService.class).putExtra("RREQ", "true");
+        //ここではCallPutStrDialogActivityを起動させるためのインテントになる
+        Intent notificationIntent = new Intent(this, ConnectManageService.class).putExtra("cmd", "putMessage");
         PendingIntent pendingIntent = PendingIntent.getService(this, 0, notificationIntent, 0);
         /**
          * サービスを長持ちさせるために通知を作成する
@@ -393,11 +393,11 @@ public class ConnectManageService extends Service implements
         Log.d(TAG, "onStartCommand");
         builder.setContentText("onStartCommand");
         mNM.notify(1, builder.build());
-        if("true".equals( intent.getStringExtra("RREQ") ) )
-        {
-            //TODO: 送信する予定のメッセージを入力する画面
-            //TODO: "textMessage"インテントを受け取る
-            messageBuffer = "test";
+        //CallPutStrDialogActivityから受け取ったインテントの場合
+        //messageBufferに文字列を登録してメッセージ作成に移行
+        if(intent.getStringExtra("textMessage") != null){
+            messageBuffer = intent.getStringExtra("textMessage");
+            Log.d(TAG, "onStartCommand: textMessage is "+ messageBuffer);
             //デスティネーションアドレスがKeyの経路表は存在するか？
             if(mRouteLists.containsKey( mDestinationAddress ) ){
                 //SENDメッセージ送信準備
@@ -408,12 +408,22 @@ public class ConnectManageService extends Service implements
                 Log.d(TAG, "onStartCommand: mode RREQ");
                 createRREQMessage();
             }
+        }else if(intent.getStringExtra("cmd") != null) {
+            switch(intent.getStringExtra("cmd") ){
+                case "putMessage":
+                    //通知プッシュ時、CallPutStrDialogActivityを呼び出して文字列入力
+                    Intent i = new Intent(ConnectManageService.this, CallPutStrDialogActivity.class);
+                    i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                    getApplicationContext().startActivity(i);
+                    break;
+                default:
+                    Log.e(TAG, "onStartCommand: cmd Intent cannot understood command:" + intent.getStringExtra("cmd") );
+                    break;
+            }
         }
-
         /** このreturn値によってサービスが停止しても再起動が行われる
          * （終了前のintentが保持されていてonStartCommandに再度渡される） */
         return START_REDELIVER_INTENT;
-
     }
 
     // サービス停止時
