@@ -71,7 +71,6 @@ public class GDetailActivity extends AppCompatActivity {
         // intent.putExtra("group_name", group_id[i]); を取得
         group_id = intent.getStringExtra("group_id");
         orderOfGroupList = intent.getIntExtra("orderOfGroupList",0);
-        Toast.makeText(GDetailActivity.this, "orderOfGroupList: " + orderOfGroupList, Toast.LENGTH_SHORT).show();
 
         tv_groupname = (TextView) findViewById(R.id.tv_groupname);
         tv_groupid = (TextView) findViewById(R.id.tv_groupid);
@@ -185,11 +184,9 @@ public class GDetailActivity extends AppCompatActivity {
                 Toast.makeText(GDetailActivity.this, "位置情報の取得は既に許可されています", Toast.LENGTH_SHORT).show();
                 // 権限があるので次に進む
                 if(posting == true)
-                {
                     getFacebookPermission();
-                }else {
-                    startNearbyConnections();
-                }/* if(posting == true) */
+                else startNearbyConnections();
+            /* if(posting == true) */
             } else {
                 // なければ権限を求めるダイアログを表示
                 requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},
@@ -223,7 +220,6 @@ public class GDetailActivity extends AppCompatActivity {
                 } else {
                     // ユーザーが許可しなかったとき
                     // 許可されなかったため機能が実行できないことを表示する
-
                     Toast.makeText(GDetailActivity.this, "Nearby Connections API利用のためにパーミッション許可が必要です", Toast.LENGTH_SHORT).show();
                 }
                 return;
@@ -382,7 +378,6 @@ public class GDetailActivity extends AppCompatActivity {
                                 // そのコミュニティトークンを自らが作成したかを判別する
                                 SharedPreferences sharedPreferences = getSharedPreferences("accounts", Context.MODE_PRIVATE); //インスタンス取得
                                 if(sharedPreferences.getBoolean(group_id, false)){
-                                    Toast.makeText(GDetailActivity.this, "true", Toast.LENGTH_LONG).show();
                                     // そのコミュニティトークンはワシが作った
                                     // コミュニティトークンを削除するボタンを表示
                                     btn_Delete.setVisibility(View.VISIBLE);
@@ -390,7 +385,6 @@ public class GDetailActivity extends AppCompatActivity {
                                 } else {
                                     // 自分が作っていない場合、
                                     // 特にコミュニティトークンに介入できる余地がない
-                                    Toast.makeText(GDetailActivity.this, "false", Toast.LENGTH_LONG).show();
                                 }
                             }
                         } catch (JSONException e) {

@@ -1069,7 +1069,7 @@ public class ConnectManageService extends Service implements
                                         Log.d(TAG,"onEndpointFound: Endpoint = RREQ");
                                         //相手のAdvertiserはRREQを送りたい
                                         // 通信相手候補のName(MACアドレス)と一致するNextHopを含む経路表を自分は持っているか？
-                                        if( isRouteMapHaveNextHopAdd(mRouteLists,info.getEndpointName() ) ) {
+                                        if( isRouteMapHaveNextHopAdd(mRouteLists, endpoint.getName() ) ) {
                                             Log.d(TAG,"RouteList = true");
                                             //通信相手候補のName(MACアドレス)と一致するNextHopを含む経路表を持っている
                                             // 通信相手候補を見なかったことにする
@@ -1091,20 +1091,20 @@ public class ConnectManageService extends Service implements
                                     case "4":
                                         // 相手のAdvertiserはとSENDメッセージを送りたい
                                         // 通信相手候補のName(MACアドレス)と一致するNextHopを含む経路表を自分は持っているか？
-                                        if( isRouteMapHaveNextHopAdd(mRouteLists,info.getEndpointName() ) ) {
-                                            Log.d(TAG,"onEndpointFound: Endpoint = RREQ && RouteList = true");
+                                        if( isRouteMapHaveNextHopAdd(mRouteLists, endpoint.getName() ) ) {
+                                            Log.d(TAG,"onEndpointFound: Endpoint = SEND && RouteList = true");
                                             // 通信相手候補のName(MACアドレス)と一致するNextHopを含む経路表を持っている
                                             mDiscoveredEndpoints.put(endpointId, endpoint);
                                             onEndpointDiscovered(endpoint);
                                         }else{
-                                            Log.d(TAG,"onEndpointFound: Endpoint = RREQ && RouteList = false");
+                                            Log.d(TAG,"onEndpointFound: Endpoint = SEND && RouteList = false");
                                             // 通信相手候補のName(MACアドレス)と一致するNextHopを含む経路表を持っていない
                                             // 通信相手候補を見なかったことにする
                                             onEndpointLost(endpointId);
                                         }
                                         break;
                                     default:
-                                        Log.d(TAG,"onEndpointFound: Endpoint = Unknown");
+                                        Log.e(TAG,"onEndpointFound: Endpoint = error");
                                         //相手のAdvertiserに送りたいメッセージが無いのはおかしい
                                         // 通信相手候補を見なかったことにする
                                         onEndpointLost(endpointId);
@@ -1854,9 +1854,10 @@ public class ConnectManageService extends Service implements
      * （onEndpointFoundで使用）
      */
     public boolean isRouteMapHaveNextHopAdd(Map<String, RouteList> map, String searchAddress){
-        Log.d(TAG, "isRouteMapHaveNextHopAdd");
+        Log.d(TAG, "isRouteMapHaveNextHopAdd: searchAddress is " + searchAddress);
         //mapに含まれる全てのキーをkey変数に代入し、for文でそれぞれについて処理を行う
         for (String key : map.keySet() ) {
+            Log.d(TAG, "isRouteMapHaveNextHopAdd: compare with " + map.get(key).getHopAdd());
             if( searchAddress.equals( map.get(key).getHopAdd() ) ){
                 /*
                  * もしもmapに含まれるとあるキーに対応する経路表に含まれるNextHopAddressが
