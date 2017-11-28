@@ -134,5 +134,5 @@
         app:layout_constraintLeft_toRightOf="@+id/authentication"
         android:layout_marginLeft="36dp"
         android:layout_marginRight="39dp" />
-    
+
 </android.support.constraint.ConstraintLayout>
