@@ -82,7 +82,7 @@ public class SettingActivity extends AppCompatActivity {
 
                 AlertDialog.Builder dialog = new AlertDialog.Builder(SettingActivity.this);
 
-                dialog.setTitle("MBoDを入力してください");
+                dialog.setTitle("Please enter MBoD");
                 dialog.setView(mbodView);
 
 
@@ -107,7 +107,7 @@ public class SettingActivity extends AppCompatActivity {
                 });
 
                 // キャンセルボタンの設定
-                dialog.setNegativeButton("キャンセル", new DialogInterface.OnClickListener() {
+                dialog.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int whichButton) {
                         // キャンセルボタンをタップした時の処理をここに記述
                     }
@@ -132,7 +132,7 @@ public class SettingActivity extends AppCompatActivity {
 
                 AlertDialog.Builder dialog = new AlertDialog.Builder(SettingActivity.this);
 
-                dialog.setTitle("MACアドレス(xx:xx:xx:xx:xx:xx)を入力してください");
+                dialog.setTitle("Please Enter MAC Address (xx:xx:xx:xx:xx:xx)");
                 dialog.setView(macAddressView);
 
 
@@ -156,7 +156,7 @@ public class SettingActivity extends AppCompatActivity {
                 });
 
                 // キャンセルボタンの設定
-                dialog.setNegativeButton("キャンセル", new DialogInterface.OnClickListener() {
+                dialog.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int whichButton) {
                         // キャンセルボタンをタップした時の処理をここに記述
                     }

@@ -30,14 +30,16 @@ public class CallPutStrDialogActivity extends Activity{
                         Intent sendMessageIntent = new Intent(CallPutStrDialogActivity.this, ConnectManageService.class)
                                 .putExtra("textMessage", editView.getText().toString());
                         startService(sendMessageIntent);
+                        dialog.cancel();
+                        finish();
                     }
                 })
                 .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int whichButton) {
-                        return;
+                    public void onClick(DialogInterface dialog, int id) {
+                        dialog.cancel();
+                        finish();
                     }
-                })
-                .show();
+                });
         AlertDialog alert = builder.create();
         alert.show();
     }
