@@ -11,7 +11,7 @@
         android:layout_width="150dp"
         android:layout_height="60dp"
         android:layout_marginTop="43dp"
-        android:text="グループ一覧"
+        android:text="Groups"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/textView"
@@ -37,7 +37,7 @@
         android:id="@+id/setting"
         android:layout_width="150dp"
         android:layout_height="60dp"
-        android:text="設定"
+        android:text="Settings"
         tools:layout_constraintTop_creator="1"
         tools:layout_constraintRight_creator="1"
         app:layout_constraintRight_toRightOf="parent"
@@ -55,6 +55,7 @@
         app:layout_constraintTop_toBottomOf="@+id/setting"
         app:layout_constraintRight_toRightOf="parent"
         app:layout_constraintLeft_toLeftOf="parent"
+        android:visibility="gone"
         />
 
 </android.support.constraint.ConstraintLayout>

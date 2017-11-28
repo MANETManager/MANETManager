@@ -1,7 +1,10 @@
 package com.example.koichi.manetmanager;
 
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -11,6 +14,7 @@ import android.widget.Button;
 import android.util.Log;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.facebook.AccessToken;
 import com.facebook.GraphRequest;
@@ -22,24 +26,33 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+//TODO: オフライン時かつCトークンをグローバル変数として保持している際にグループ一覧ボタンを押した場合、
+// グループ一覧画面を飛ばし、GdetailActivityを利用しGraphAPIなしで自身の所持しているCトークンの情報を表示する動作の実装
 
 public class MenuActivity extends AppCompatActivity {
 
     private static final String TAG = "MenuActivity";
+    private Common common;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_menu);
 
-                //グループ一覧
+        //グループ一覧
         Button group_Button = (Button) findViewById(R.id.group);
         group_Button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Intent intent = new Intent(getApplication(), GroupActivity.class);
-                startActivity(intent);
-
+                // Graph API自体がネットワーク接続を考慮しようとしないので別途チェック
+                if(netWorkCheck( getApplication() ) ){
+                    Intent intent = new Intent(getApplication(), GroupActivity.class);
+                    startActivity(intent);
+                }else{
+                    // ネットワーク接続が確認できなければボタンによる動作を実行しない
+                    Toast.makeText(MenuActivity.this,
+                            "インターネットへの接続が必要です", Toast.LENGTH_SHORT).show();
+                }
             }
         });
 
@@ -59,16 +72,40 @@ public class MenuActivity extends AppCompatActivity {
         btnGraphApiTest.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                common = (Common) MenuActivity.this.getApplication();
+                Toast.makeText(MenuActivity.this, "common.MACaddress: " + common, Toast.LENGTH_LONG).show();
+                /*
                 switch (v.getId()) {
                     case R.id.btnGraphApiTest:
-                        GraphApiTest();
-                        break;
+                        // Graph API自体がネットワーク接続を考慮しようとしないので別途チェック
+                        if(netWorkCheck( getApplication() ) ){
+                            GraphApiTest();
+                            break;
+                        }else{
+                            // ネットワーク接続が確認できなければボタンによる動作を実行しない
+                            Toast.makeText(MenuActivity.this,
+                                    "インターネットへの接続が必要です", Toast.LENGTH_LONG).show();
+                            break;
+                        }
+                    default:
 
                 }
-
+                :
+               */
             }
         });
 
+    }
+
+    // ネットワーク接続確認
+    public static boolean netWorkCheck(Context context){
+        ConnectivityManager cm =  (ConnectivityManager)context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo info = cm.getActiveNetworkInfo();
+        if( info != null ){
+            return info.isConnected();
+        } else {
+            return false;
+        }
     }
 
     private void GraphApiTest() {

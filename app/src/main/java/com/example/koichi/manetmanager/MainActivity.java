@@ -76,6 +76,7 @@ public class MainActivity extends AppCompatActivity {
         authentication_Button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                //TODO: Facebookへの手動ログイン実装
                 //ユーザー名とパスワードの取得
                 value_username = (EditText)findViewById(R.id.value_username);
                 value_password = (EditText)findViewById(R.id.value_password);
@@ -174,5 +175,4 @@ public class MainActivity extends AppCompatActivity {
             }
         });
     }
-
 }

@@ -102,6 +102,7 @@ public class SettingActivity extends AppCompatActivity {
                         double double_mbod = parseDouble(string_mbod);
                         mbod.setText(string_mbod);
                         common.setMbod(double_mbod); //グローバル関数に代入
+
                     }
                 });
 
@@ -168,19 +169,24 @@ public class SettingActivity extends AppCompatActivity {
 
 
         //ログアウト
+        //TODO: ログアウト時にCトークン関係の変数を設定データに保存する動作の実装
         logout_Button = (Button) findViewById(R.id.logout);
         logout_Button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 //端末内に情報を保存
                 //下2行がもうちょいすっきりできる気がするww
+                //Accounts型を収納するArrayListからgetメソッドで【今ログインしてる垢】番目のAccounts型を呼び出し
+                //そのAccountsについてグローバル変数のMbodとMacAddressを保存する
                 common.getAccountGroup().get(common.getListIndex()).setMbod(common.getMbod());
                 common.getAccountGroup().get(common.getListIndex()).setMacAddress(common.getMacAddress());
                 Gson gson = new Gson();
-                SharedPreferences sharedPreferences = getSharedPreferences("accounts", Context.MODE_PRIVATE);
-                SharedPreferences.Editor editor = sharedPreferences.edit();
+                //SharedPreferences:アプリの設定データをデバイス内に保存する
+                SharedPreferences sharedPreferences = getSharedPreferences("accounts", Context.MODE_PRIVATE); //インスタンス取得
+                SharedPreferences.Editor editor = sharedPreferences.edit(); //SharedPreferences.Editorオブジェクトを取得
+                //設定データへString型でArrayList<Accounts> accountGroupオブジェクトをjson型で記述
                 editor.putString("accountJson", gson.toJson(common.getAccountGroup()));
-                editor.apply();
+                editor.apply(); //保存？
                 //グローバル関数の初期化
                 common.init();
                 //画面遷移

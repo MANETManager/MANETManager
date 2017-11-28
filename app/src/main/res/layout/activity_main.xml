@@ -30,7 +30,7 @@
         android:layout_marginBottom="57dp"
         android:layout_marginTop="62dp"
         android:onClick="authentication"
-        android:text="FB認証"
+        android:text="Login"
         android:textSize="20sp"
         app:layout_constraintBottom_toBottomOf="@+id/login_button"
         app:layout_constraintHorizontal_bias="0.192"
@@ -41,7 +41,8 @@
         tools:layout_constraintBottom_creator="1"
         tools:layout_constraintLeft_creator="1"
         tools:layout_constraintRight_creator="1"
-        tools:layout_constraintTop_creator="1" />
+        tools:layout_constraintTop_creator="1"
+        tools:ignore="OnClick" />
 
 
     <com.facebook.login.widget.LoginButton
@@ -120,7 +121,7 @@
         android:id="@+id/account_setting"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:text="アカウント管理"
+        android:text="account manage"
         tools:layout_constraintTop_creator="1"
         tools:layout_constraintRight_creator="1"
         tools:layout_constraintBottom_creator="1"

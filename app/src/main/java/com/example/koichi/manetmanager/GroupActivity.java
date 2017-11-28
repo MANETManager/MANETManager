@@ -1,8 +1,12 @@
 package com.example.koichi.manetmanager;
 
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.graphics.Color;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -20,11 +24,14 @@ import com.facebook.GraphRequest;
 import com.facebook.GraphRequestAsyncTask;
 import com.facebook.GraphResponse;
 import com.facebook.HttpMethod;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.StringTokenizer;
@@ -37,10 +44,14 @@ public class GroupActivity extends AppCompatActivity {
     Button btnGroup[]; //ボタン:メンバー変数
     private static final String TAG = "GroupActivity";
 
+    private Common common;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_group);
+
+        common = (Common) this.getApplication();
 
         int MATCH_PARENT = ViewGroup.LayoutParams.MATCH_PARENT;
         int btnId; // ボタンのリソースIDを取得するためのint
@@ -68,18 +79,27 @@ public class GroupActivity extends AppCompatActivity {
             btnGroup[i].setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    Button btn = (Button) v; // クリックされたボタンをキャスト
-                    String btn_text = btn.getText().toString(); // ボタンに設定している文字列を取得
+                    // Graph API自体がネットワーク接続を考慮しようとしないので別途チェック
+                    if(netWorkCheck( getApplication() ) ){
+                        // ボタンの実際の動作を行う
+                        Button btn = (Button) v; // クリックされたボタンをキャスト
+                        String btn_text = btn.getText().toString(); // ボタンに設定している文字列を取得
 
-                    List<String> list = Arrays.asList(group_name); //グループ名配列をList型オブジェクトに変換
-                    int i = list.indexOf(btn_text);
+                        List<String> list = Arrays.asList(group_name); //グループ名配列をList型オブジェクトに変換
+                        int i = list.indexOf(btn_text);
 
-                    Intent intent = new Intent(getApplication(), GDetailActivity.class);
-                    intent.putExtra("group_name", group_name[i]);
-                    intent.putExtra("group_id", group_id[i]);
-                    startActivity(intent);
+                        Intent intent = new Intent(getApplication(), GDetailActivity.class);
+                        intent.putExtra("group_name", group_name[i]);
+                        intent.putExtra("group_id", group_id[i]);
+                        intent.putExtra("orderOfGroupList",i);
+                        startActivity(intent);
 
-                    //Log.i(TAG, "TEST: " + group_name[i]);
+                        //Log.i(TAG, "TEST: " + group_name[i]);
+                    }else{
+                        // ネットワーク接続が確認できなければボタンによる動作を実行しない
+                        Toast.makeText(GroupActivity.this,
+                                "インターネットへの接続が必要です", Toast.LENGTH_SHORT).show();
+                    }
                 }
             });
         }
@@ -126,6 +146,7 @@ public class GroupActivity extends AppCompatActivity {
                                     // 書き込みにname・idが存在しないのでスルーする
                                 }
                             }
+
                             // setText変更した分を再描画
                             for(int i=0;i<group_num;i++) {
                                 btnGroup[i].setText(group_name[i]);
@@ -143,5 +164,16 @@ public class GroupActivity extends AppCompatActivity {
                     }
                 }
         ).executeAsync();
+    }
+
+    // ネットワーク接続確認
+    public static boolean netWorkCheck(Context context){
+        ConnectivityManager cm =  (ConnectivityManager)context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo info = cm.getActiveNetworkInfo();
+        if( info != null ){
+            return info.isConnected();
+        } else {
+            return false;
+        }
     }
 }

@@ -125,36 +125,6 @@
         />
 
     <TextView
-        android:id="@+id/textView5"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Max Time(min):"
-        android:textSize="20sp"
-        android:layout_marginStart="0dp"
-        android:layout_marginTop="10dp"
-        android:layout_marginLeft="0dp"
-        tools:layout_constraintTop_creator="1"
-        tools:layout_constraintLeft_creator="1"
-        app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/textView4"
-        />
-
-    <TextView
-        android:id="@+id/tv_mt"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="null"
-        android:textSize="20sp"
-        android:layout_marginStart="10dp"
-        android:layout_marginTop="10dp"
-        android:layout_marginLeft="0dp"
-        tools:layout_constraintTop_creator="1"
-        tools:layout_constraintLeft_creator="1"
-        app:layout_constraintLeft_toRightOf="@+id/textView5"
-        app:layout_constraintTop_toBottomOf="@+id/textView4"
-        />
-
-    <TextView
         android:id="@+id/textView6"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -166,7 +136,7 @@
         tools:layout_constraintTop_creator="1"
         tools:layout_constraintLeft_creator="1"
         app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/textView5"
+        app:layout_constraintTop_toBottomOf="@+id/textView4"
         />
 
     <TextView
@@ -181,13 +151,13 @@
         tools:layout_constraintTop_creator="1"
         tools:layout_constraintLeft_creator="1"
         app:layout_constraintLeft_toRightOf="@+id/textView6"
-        app:layout_constraintTop_toBottomOf="@+id/textView5"
+        app:layout_constraintTop_toBottomOf="@+id/textView4"
         />
 
     <Button
         android:layout_height="wrap_content"
         android:layout_width="wrap_content"
-        android:text="コミュニティトークン作成"
+        android:text="Make C-Token"
         android:id="@+id/btnCreate"
         android:layout_marginTop="15dp"
         android:visibility="gone"
@@ -200,7 +170,7 @@
         android:id="@+id/textView7"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="＜作成オプション＞"
+        android:text="＜Options＞"
         android:textSize="24sp"
         android:layout_marginStart="0dp"
         android:layout_marginTop="5dp"
@@ -214,37 +184,10 @@
         />
 
     <TextView
-        android:id="@+id/textView8"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="使用予定時間:"
-        android:textSize="20sp"
-        android:layout_marginStart="0dp"
-        android:layout_marginTop="5dp"
-        android:layout_marginLeft="0dp"
-        android:visibility="gone"
-        tools:layout_constraintTop_creator="1"
-        tools:layout_constraintLeft_creator="1"
-        app:layout_constraintLeft_toLeftOf="@+id/btnCreate"
-        app:layout_constraintTop_toBottomOf="@+id/textView7"
-        />
-
-    <Spinner
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="5dp"
-        android:id="@+id/spinner_MT"
-        android:entries="@array/spinner_MT"
-        android:spinnerMode="dropdown"
-        android:visibility="gone"
-        app:layout_constraintLeft_toRightOf="@+id/textView8"
-        app:layout_constraintTop_toBottomOf="@+id/textView7"/>
-
-    <TextView
         android:id="@+id/textView9"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="電池消費許容:"
+        android:text="Battery consumpt:"
         android:textSize="20sp"
         android:layout_marginStart="0dp"
         android:layout_marginTop="5dp"
@@ -252,8 +195,8 @@
         android:visibility="gone"
         tools:layout_constraintTop_creator="1"
         tools:layout_constraintLeft_creator="1"
-        app:layout_constraintLeft_toLeftOf="@+id/btnCreate"
-        app:layout_constraintTop_toBottomOf="@+id/textView8"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/textView7"
         />
 
     <Spinner
@@ -264,19 +207,31 @@
         android:entries="@array/spinner_MB"
         android:spinnerMode="dropdown"
         android:visibility="gone"
-        app:layout_constraintLeft_toLeftOf="@+id/spinner_MT"
-        app:layout_constraintTop_toBottomOf="@+id/textView8"/>
+        app:layout_constraintLeft_toRightOf="@+id/textView9"
+        app:layout_constraintTop_toBottomOf="@+id/textView7"/>
 
     <Button
         android:layout_height="wrap_content"
         android:layout_width="wrap_content"
-        android:text="コミュニティトークン削除"
+        android:text="Delete C-Token"
         android:id="@+id/btnDelete"
         android:layout_marginTop="5dp"
         android:visibility="gone"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/textView6"
+        />
+
+    <Button
+        android:layout_height="wrap_content"
+        android:layout_width="wrap_content"
+        android:text="Start Ad-hoc"
+        android:id="@+id/btnSetNearby"
+        android:layout_marginTop="5dp"
+        android:visibility="gone"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/btnDelete"
         />
 
 

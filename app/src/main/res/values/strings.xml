@@ -1,22 +1,15 @@
 <resources>
-    <string name="app_name">MANET Manager</string>
-    <string name="save">保存</string>
-    <string name="cancel">キャンセル</string>
+    <string name="app_name">Social DTN Manager</string>
+    <string name="save">save</string>
+    <string name="cancel">cancel</string>
     <string name="input_mbod"></string>
     <string name="input_macaddress"></string>
     <string name="facebook_app_id">1531881133535274</string>
     <string name="fb_login_protocol_scheme">fb1531881133535274</string>
-    <string-array name="spinner_MT">
-        <item>10分</item>
-        <item>20分</item>
-        <item>30分</item>
-        <item>40分</item>
-        <item>50分</item>
-    </string-array>
     <string-array name="spinner_MB">
-        <item>10%（SNS）</item>
-        <item>20%（ブラウザー）</item>
-        <item>30%（動画）</item>
+        <item>10%(SNS)</item>
+        <item>20%(Web Browse)</item>
+        <item>30%(Movies)</item>
     </string-array>
 
     <string name="error_missing_permissions">Cannot start without required permissions</string>
