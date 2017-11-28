@@ -716,8 +716,8 @@ public class ConnectManageService extends Service implements
                                 receivedPayload.getST(5)
                         );
                         // 経路探索-要求状態へ移行
+                        setDisState(dis_State.SUSPEND);
                         setAdvState(adv_State.REQUEST);
-
                     }else if("2".equals( receivedPayload.getST(0) ) ){
                         Log.d(TAG, "onEndpointDisconnected: I am RELAY Node & received RREP");
                         // RREPにおける経路表構築
@@ -741,6 +741,7 @@ public class ConnectManageService extends Service implements
                                 String.valueOf( mRouteLists.get( receivedPayload.getST(4) ).getSeqNum() )
                         );
                         // 経路探索-返信状態へ移行
+                        setDisState(dis_State.SUSPEND);
                         setAdvState(adv_State.REPLY);
                     }else{
                         // 中継ノードがRREQ,RREP以外を受け取った
@@ -773,6 +774,7 @@ public class ConnectManageService extends Service implements
                             String.valueOf( parseInt(receivedPayload.getST(3) ) + 1 )
                     );
                     // 経路探索-返信状態へ移行する。
+                    setDisState(dis_State.SUSPEND);
                     setAdvState(adv_State.REPLY);
                     break;
                 case SOURCE:
@@ -807,6 +809,7 @@ public class ConnectManageService extends Service implements
                                 .show();
 
                         // メッセージ受信完了。念のためにAdvertiseを終了する
+                        setDisState(dis_State.NORMAL);
                         setAdvState(adv_State.STOP);
                     }else{
                         // SENDメッセージを作成する。
@@ -825,9 +828,6 @@ public class ConnectManageService extends Service implements
         Toast.makeText(
                 this, getString(R.string.toast_disconnected, endpoint.getName()), Toast.LENGTH_SHORT)
                 .show();
-        //setState(State.SEARCHING);
-        // 通常状態としての動作も冒頭に戻り、Discoverを再度スタート
-        setDisState(dis_State.NORMAL);
     }
 
     /** Nearby ConnectionsのGoogleAPIClientに接続できなかったとき。あーあ。 */
@@ -849,8 +849,12 @@ public class ConnectManageService extends Service implements
         builder.setContentText("onConnectionFailed(Endpoint endpoint)");
         mNM.notify(1, builder.build());
 
+        //advとdisを停止する（が、条件分岐の都合上Stateには影響させない）
+        stopAdvertising();
+        stopWaitByDiscovering();
+
         //依然探索状態であるか？（Discoverができない状況なら再試行する必要がない）
-        if (getDisState() != dis_State.STOP) {
+        if (getDisState() == dis_State.NORMAL) {
             //（接続先候補を削った場合を含めて）DiscoveredEndpointsマップが空ではないか？
             if(!getDiscoveredEndpoints().isEmpty()) {
                 //DiscoveredEndpoints（接続先候補）からランダムに抽出して再試行
@@ -994,15 +998,6 @@ public class ConnectManageService extends Service implements
                                 }
                             }
                         });
-    }
-
-    /**
-     * Discoverモードを停止する。
-     * startWaitByDiscovering()もこちらで止められる。
-     */
-    protected void stopDiscovering() {
-        mIsDiscovering = false;
-        Nearby.Connections.stopDiscovery(mGoogleApiClient);
     }
 
     /** @return Discoverモードならtrueを返す。 */
@@ -1258,19 +1253,23 @@ public class ConnectManageService extends Service implements
                 //TODO: STOPになっていてサービス起動中にコミュニティトークン取得した場合
                 //どうやって復帰すればいいの？
                 Log.d(TAG,"dis_State: STOP");
-                //通知
                 disBuilder.setContentText("STOP")
                         .setColor( Color.argb(0, 0, 0, 0) );
                 mNM.notify(2, disBuilder.build());
-
                 disconnectFromAllEndpoints(); //Cトークンの破棄を伝える関数
                 myRole = isMyRole.UNKNOWN;
-                stopDiscovering();
+                stopWaitByDiscovering();
+                break;
+            case SUSPEND:
+                //Advertise中において通信効率向上のためDiscoverを停止しておく
+                disBuilder.setContentText("SUSPEND")
+                        .setColor( Color.argb(0, 0, 0, 0) );
+                mNM.notify(2, disBuilder.build());
+                myRole = isMyRole.UNKNOWN;
+                stopWaitByDiscovering();
                 break;
             case NORMAL:
                 Log.d(TAG,"dis_state: NORMAL");
-
-                // 通知
                 disBuilder.setContentText("NORMAL")
                         .setColor( Color.argb(125, 0, 0, 255) );
                 mNM.notify(2, disBuilder.build());
@@ -1574,6 +1573,7 @@ public class ConnectManageService extends Service implements
      */
     public enum dis_State{
         STOP,
+        SUSPEND,
         NORMAL,
         CONNECTED
     }
@@ -1833,6 +1833,7 @@ public class ConnectManageService extends Service implements
                 "1"
         );
         // 経路探索-要求状態へ移行
+        setDisState(dis_State.SUSPEND);
         setAdvState(adv_State.REQUEST);
     }
 
@@ -1842,6 +1843,7 @@ public class ConnectManageService extends Service implements
                 = new SendingPayload( "4", targetAddress,"0",
                 mName,"1", messageBuffer );
         // 経路構築完了状態へ移行
+        setDisState(dis_State.SUSPEND);
         setAdvState(adv_State.CONSTRUCTED);
     }
 
