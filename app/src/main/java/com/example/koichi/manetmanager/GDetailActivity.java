@@ -47,7 +47,7 @@ import com.google.gson.reflect.TypeToken;
 
 public class GDetailActivity extends AppCompatActivity {
 
-    private static final int MY_PERMISSIONS_ACCESS_COARSE_LOCATION = 1;
+    private static final int MY_PERMISSIONS = 1;
     private TextView tv_groupname, tv_groupid, tv_tokenid, tv_mb, tv_saddress, noticeMakeToken, MBMaketoken;
     private Button btn_Create, btn_Delete, btnSetNearby;
     private Spinner spinner_MB;
@@ -55,6 +55,7 @@ public class GDetailActivity extends AppCompatActivity {
     int orderOfGroupList;
     private static final String TAG = "GDetailActivity";
     CallbackManager callbackManager;
+    boolean posting = true;
 
     private Common common;
 
@@ -94,7 +95,8 @@ public class GDetailActivity extends AppCompatActivity {
                 // まずはAndroidアプリのパーミッション許可を確認する
                 // その後、Facebook側の投稿パーミッション許可を確認する
                 // 両方が許可されれば、postToFB()→startNearbyConnections()を順に呼び出す
-                requestAppPermissions(true);
+                posting = true;
+                requestAppPermissions(posting);
             }
         });
         // btn_Create.setOnClickListenerここまで
@@ -180,50 +182,52 @@ public class GDetailActivity extends AppCompatActivity {
         // (NearbyConnectionsで用いるBluetooth,WiFi,現在地）
         // Android 6.0以上の場合
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-            // 位置情報の取得が許可されているかチェック
-            if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                //Toast.makeText(GDetailActivity.this, "Permission of Location is already allowed", Toast.LENGTH_SHORT).show();
-                // 権限があるので次に進む
-                if(posting == true)
-                    getFacebookPermission();
-                else startNearbyConnections();
-            /* if(posting == true) */
-            } else {
-                // なければ権限を求めるダイアログを表示
-                requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},
-                        MY_PERMISSIONS_ACCESS_COARSE_LOCATION);
+            if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED
+                    ||checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+                    ||checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION,
+                        Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                        Manifest.permission.READ_EXTERNAL_STORAGE}, MY_PERMISSIONS);
                 // この後、許可拒否に関わらずonRequestPermissionsResult()が呼び出される
+            }else{
+                if(posting) {
+                    getFacebookPermission();
+                }
+                else {
+                    startNearbyConnections();
+                }
             }
-            // Android 6.0以下の場合
-        } else {
-            // インストール時点で許可されているのでチェックの必要なし
-            //Toast.makeText(GDetailActivity.this, "Under Android 5.0", Toast.LENGTH_SHORT).show();
-            // 権限があるので次に進む
-            if(posting == true)
-            {
-                getFacebookPermission();
-            }else {
-                startNearbyConnections();
-            }/* if(posting == true) */
+            return;
+        }
+        // Android 6.0以下の場合はインストール時点で許可されているのでチェックの必要なし
+        if(posting) {
+            getFacebookPermission();
+        }
+        else {
+            startNearbyConnections();
         }
     }
+
 
     @Override
     public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
         switch (requestCode) {
             // 先ほどの独自定義したrequestCodeの結果確認
-            case MY_PERMISSIONS_ACCESS_COARSE_LOCATION: {
-                if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    // ユーザーが許可したとき
-                    // 許可が必要な機能を改めて実行する
-
-                    getFacebookPermission();
+            case MY_PERMISSIONS: {
+                if (grantResults[0] == PackageManager.PERMISSION_GRANTED
+                        && grantResults[1] == PackageManager.PERMISSION_GRANTED
+                        && grantResults[2] == PackageManager.PERMISSION_GRANTED) {
+                    if(posting) {
+                        getFacebookPermission();
+                    }
+                    else {
+                        startNearbyConnections();
+                    }
                 } else {
                     // ユーザーが許可しなかったとき
                     // 許可されなかったため機能が実行できないことを表示する
                     Toast.makeText(GDetailActivity.this, "Permission of Location is needed", Toast.LENGTH_SHORT).show();
                 }
-                return;
             }
         }
     }
@@ -374,7 +378,8 @@ public class GDetailActivity extends AppCompatActivity {
                                 // コミュニティトークンが存在する
                                 viewOfMaketoken(0);
                                 // サービスは起動する
-                                requestAppPermissions(false);
+                                posting = false;
+                                requestAppPermissions(posting);
 
                                 // そのコミュニティトークンを自らが作成したかを判別する
                                 SharedPreferences sharedPreferences = getSharedPreferences("accounts", Context.MODE_PRIVATE); //インスタンス取得

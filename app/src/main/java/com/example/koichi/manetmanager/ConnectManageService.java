@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
+import android.net.Uri;
 import android.os.IBinder;
 import android.Manifest;
 import android.content.Context;
@@ -184,7 +185,9 @@ public class ConnectManageService extends Service implements
      */
     private boolean mIsReceiving = false;
 
-    final static String TAG = "ConnectManageService";
+    private final static String TAG = "ConnectManageService";
+
+    private Uri pictMessage;
 
     /*
      * デスティネーションノードのアドレス、今回の研究では固定値となる
@@ -204,9 +207,6 @@ public class ConnectManageService extends Service implements
                             String.format(
                                     "onConnectionInitiated(endpointId=%s, endpointName=%s)",
                                     endpointId, connectionInfo.getEndpointName()));
-                    builder.setContentText("onConnectionInitiated");
-                    mNM.notify(1, builder.build());
-
                     Endpoint endpoint = new Endpoint(endpointId, connectionInfo.getEndpointName());
                     mPendingConnections.put(endpointId, endpoint);
                     ConnectManageService.this.onConnectionInitiated(endpoint, connectionInfo);
@@ -216,14 +216,11 @@ public class ConnectManageService extends Service implements
                 @Override
                 public void onConnectionResult(String endpointId, ConnectionResolution result) {
                     Log.d(TAG, String.format("onConnectionResponse(endpointId=%s, result=%s)", endpointId, result));
-                    builder.setContentText("onConnectionResponse");
-                    mNM.notify(1, builder.build());
-
                     // We're no longer connecting
                     Log.v(TAG,"mIsConnecting = false");
                     mIsConnecting = false;
 
-                    if (!result.getStatus().isSuccess()) {
+                    if ( !result.getStatus().isSuccess() ){
                         Log.w(TAG,
                                 String.format(
                                         "Connection failed. Received status %s.",
@@ -234,9 +231,9 @@ public class ConnectManageService extends Service implements
                         mNM.notify(1, builder.build());
 
                         onConnectionFailed(mPendingConnections.remove(endpointId));
-                        return;
+                    }else{
+                        connectedToEndpoint(mPendingConnections.remove(endpointId));
                     }
-                    connectedToEndpoint(mPendingConnections.remove(endpointId));
                 }
 
                 @Override
@@ -246,10 +243,9 @@ public class ConnectManageService extends Service implements
                         Log.w(TAG, "Unexpected disconnection from endpoint " + endpointId);
                         builder.setContentText("onDisconnected: Unexpected disconnection from endpoint " + endpointId);
                         mNM.notify(1, builder.build());
-
-                        return;
+                    }else{
+                        disconnectedFromEndpoint(mEstablishedConnections.get(endpointId));
                     }
-                    disconnectedFromEndpoint(mEstablishedConnections.get(endpointId));
                 }
             };
 
@@ -263,9 +259,6 @@ public class ConnectManageService extends Service implements
                 public void onPayloadReceived(String endpointId, Payload payload) {
                     //相手から送られてきたsendPayload()の中身を受け取る
                     Log.d(TAG, String.format("onPayloadReceivedByDiscoverer(endpointId=%s, payload=%s)", endpointId, payload));
-                    builder.setContentText("onPayloadReceivedByDiscoverer");
-                    mNM.notify(1, builder.build());
-
                     //受け取ったPayloadの処理や返送・転送
                     onReceiveByDiscoverer(mEstablishedConnections.get(endpointId), payload);
                 }
@@ -275,8 +268,6 @@ public class ConnectManageService extends Service implements
                     Log.d(TAG,
                             String.format(
                                     "onPayloadTransferUpdateByDiscoverer(endpointId=%s, update=%s)", endpointId, update));
-                    builder.setContentText("onPayloadTransferUpdateByDiscoverer");
-                    mNM.notify(1, builder.build());
                 }
             };
 
@@ -290,9 +281,6 @@ public class ConnectManageService extends Service implements
                 public void onPayloadReceived(String endpointId, Payload payload) {
                     //相手から送られてきたsendPayload()の中身を受け取る
                     Log.d(TAG, String.format("onPayloadReceivedByAdvertiser(endpointId=%s, payload=%s)", endpointId, payload));
-                    builder.setContentText("onPayloadReceivedByAdvertiser");
-                    mNM.notify(1, builder.build());
-
                     onReceiveByAdvertiser(mEstablishedConnections.get(endpointId), payload);
                 }
 
@@ -301,8 +289,6 @@ public class ConnectManageService extends Service implements
                     Log.d(TAG,
                             String.format(
                                     "onPayloadTransferUpdateByAdvertiser(endpointId=%s, update=%s)", endpointId, update));
-                    builder.setContentText("onPayloadTransferUpdateByAdvertiser");
-                    mNM.notify(1, builder.build());
                 }
             };
 
@@ -391,8 +377,6 @@ public class ConnectManageService extends Service implements
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.d(TAG, "onStartCommand");
-        builder.setContentText("onStartCommand");
-        mNM.notify(1, builder.build());
         //CallPutStrDialogActivityから受け取ったインテントの場合
         //messageBufferに文字列を登録してメッセージ作成に移行
         if(intent.getStringExtra("textMessage") != null){
@@ -411,11 +395,14 @@ public class ConnectManageService extends Service implements
         }else if(intent.getStringExtra("cmd") != null) {
             switch(intent.getStringExtra("cmd") ){
                 case "putMessage":
-                    //通知プッシュ時、CallPutStrDialogActivityを呼び出して文字列入力
+                    //通知プッシュ時、CallPutStrDialogActivityを呼び出す
                     Intent i = new Intent(ConnectManageService.this, CallPutStrDialogActivity.class);
                     i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
                     getApplicationContext().startActivity(i);
                     break;
+                case "pictMessage":
+                    //TODO:CallPutDialogActivityから画像を受け取る
+                    pictMessage = intent.getData();
                 default:
                     Log.e(TAG, "onStartCommand: cmd Intent cannot understood command:" + intent.getStringExtra("cmd") );
                     break;
@@ -444,13 +431,6 @@ public class ConnectManageService extends Service implements
     @Override
     public void onConnected(@Nullable Bundle bundle) {
         Log.d(TAG, "onConnected (for GoogleApiClient)");
-
-        /** 通知 */
-        builder.setContentText("onConnected (for GoogleApiClient)");
-        mNM.notify(1, builder.build());
-
-        //super.onConnected(bundle);
-        //setState(State.SEARCHING);
         setDisState(dis_State.NORMAL);
         setAdvState(adv_State.STOP);
     }
@@ -473,11 +453,6 @@ public class ConnectManageService extends Service implements
     /** DiscoverがAdvertiserを発見した時 **/
     protected void onEndpointDiscovered(Endpoint endpoint) {
         Log.d(TAG,"onEndpointDiscovered");
-
-        /** 通知 */
-        builder.setContentText("onEndpointDiscovered");
-        mNM.notify(1, builder.build());
-
         // Advertiserへ通信を試みる
         connectToEndpoint(endpoint);
     }
@@ -491,14 +466,7 @@ public class ConnectManageService extends Service implements
      */
     protected void onConnectionInitiated(Endpoint endpoint, ConnectionInfo connectionInfo) {
         Log.d(TAG, "onConnectionInitiated");
-        /** 通知 **/
-        builder.setContentText("onConnectionInitiated");
-        mNM.notify(1, builder.build());
-
-        // 別のデバイスへの接続が開始された！ 両方の端末で同じ認証トークンを使用して、接続時に使用する色を選択する。
-        // これにより、ユーザーは接続先のデバイスを視覚的に確認できます。
-        // mConnectedColor = COLORS[connectionInfo.getAuthenticationToken().hashCode() % COLORS.length];
-
+        // 別のデバイスへの接続が開始された！
         //TODO: 共通鍵云々を実装するならばこの辺り？
         if(connectionInfo.isIncomingConnection() == false)
         {
@@ -507,11 +475,13 @@ public class ConnectManageService extends Service implements
             switch(endpoint.getMessageType()){
                 case "4":
                     //経路構築後のメッセージを受信予定
+                    Log.d(TAG, "onConnectionInitiated: I'm DELIVER Node");
                     myRole = isMyRole.DELIVER;
                     acceptConnectionByDiscoverer(endpoint);
                     break;
                 case "3":
                     //RERRメッセージ受信予定
+                    Log.d(TAG, "onConnectionInitiated: I'm ERROR Node");
                     myRole = isMyRole.ERROR;
                     acceptConnectionByDiscoverer(endpoint);
                     break;
@@ -620,29 +590,19 @@ public class ConnectManageService extends Service implements
 
     private void connectedToEndpoint(Endpoint endpoint) {
         Log.d(TAG,String.format("connectedToEndpoint(endpoint=%s)", endpoint));
-
-        /** 通知 */
-        builder.setContentText("connectedToEndpoint");
-        mNM.notify(1, builder.build());
-
         mEstablishedConnections.put(endpoint.getId(), endpoint);
         onEndpointConnected(endpoint);
     }
 
     private void disconnectedFromEndpoint(Endpoint endpoint) {
         Log.d(TAG,String.format("disconnectedFromEndpoint(endpoint=%s)", endpoint));
-
-        /** 通知 */
-        builder.setContentText("disconnectedFromEndpoint");
-        mNM.notify(1, builder.build());
-
         mEstablishedConnections.remove(endpoint.getId());
         onEndpointDisconnected(endpoint);
     }
 
     protected void onEndpointConnected(Endpoint endpoint) {
         Log.d(TAG,String.format("onEndpointConnected(endpoint=%s)", endpoint));
-        builder.setContentText("onEndpointConnected");
+        builder.setContentText("Connected endpoint: "+ endpoint.getName());
         mNM.notify(1, builder.build());
         Toast.makeText(
                 this, getString(R.string.toast_connected, endpoint.getName()), Toast.LENGTH_SHORT)
@@ -683,8 +643,7 @@ public class ConnectManageService extends Service implements
 
     protected void onEndpointDisconnected(Endpoint endpoint) {
         Log.d(TAG, "onEndpointDisconnected");
-        /** 通知 */
-        builder.setContentText("onEndpointDisconnected");
+        builder.setContentText("Message sending approved by " + endpoint.getName());
         mNM.notify(1, builder.build());
         // 相手からのメッセージを確認（して返送）済みか？
         if(mIsReceiving == true){
@@ -840,22 +799,19 @@ public class ConnectManageService extends Service implements
     /** Nearby ConnectionsのGoogleAPIClientに接続できなかったとき。あーあ。 */
     @Override
     public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
-        Log.d(TAG,"onConnectionFailed(@NonNull ConnectionResult connectionResult)");
         Log.w(TAG, String.format("onConnectionFailed(%s)",
                 ConnectManageService.toString(new Status( connectionResult.getErrorCode() ) ) ) );
-        builder.setContentText("onConnectionFailed(@NonNull ConnectionResult connectionResult)");
+        builder.setContentText("onConnectionFailed for GoogleAPIClient");
         mNM.notify(1, builder.build());
     }
 
     protected void onConnectionFailed(Endpoint endpoint) {
-        Log.d(TAG,"onConnectionFailed(Endpoint endpoint)");
-        builder.setContentText("onConnectionFailed(Endpoint endpoint)");
+        Log.d(TAG,"onConnectionFailed: " + endpoint.getName());
+        builder.setContentText("onConnectionFailed: " + endpoint.getName());
         mNM.notify(1, builder.build());
-
         //advとdisを停止する（が、条件分岐の都合上Stateには影響させない）
         stopAdvertising();
         stopWaitByDiscovering();
-
         //依然探索状態であるか？（Discoverができない状況なら再試行する必要がない）
         if (getDisState() == dis_State.NORMAL) {
             //（接続先候補を削った場合を含めて）DiscoveredEndpointsマップが空ではないか？
@@ -890,8 +846,6 @@ public class ConnectManageService extends Service implements
      */
     protected void startAdvertising() {
         Log.d(TAG,"startAdvertising");
-        builder.setContentText("startAdvertising");
-        mNM.notify(1, builder.build());
         mIsAdvertising = true;
         Nearby.Connections.startAdvertising(
                 mGoogleApiClient,
@@ -936,6 +890,8 @@ public class ConnectManageService extends Service implements
     /** Advertiseが正常に開始された。このメソッドをオーバーライドして、イベントを処理する。 */
     protected void onAdvertisingStarted() {
         Log.d(TAG,"onAdvertisingStarted");
+        builder.setContentText("Advertising started");
+        mNM.notify(1, builder.build());
     }
 
     /** Advertiseの開始に失敗した。このメソッドをオーバーライドして、イベントを処理する。 */
@@ -956,7 +912,7 @@ public class ConnectManageService extends Service implements
                                                     "acceptConnectionByDiscoverer failed. %s", ConnectManageService.toString(status)
                                             )
                                     );
-                                    builder.setContentText("acceptConnectionByDiscoverer: acceptConnection failed.");
+                                    builder.setContentText("acceptConnectionByDiscoverer: failed. " + endpoint.getName());
                                     mNM.notify(1, builder.build());
                                 }
                             }
@@ -974,14 +930,14 @@ public class ConnectManageService extends Service implements
                                     Log.w(TAG,
                                             String.format(
                                                     "acceptConnectionByAdvertiser failed."));
-                                    builder.setContentText("acceptConnectionByAdvertiser: acceptConnection failed.");
+                                    builder.setContentText("acceptConnectionByAdvertiser: failed." + endpoint.getName());
                                     mNM.notify(1, builder.build());
                                 }
                             }
                         });
     }
     /** 接続要求を拒否する。 */
-    protected void rejectConnection(Endpoint endpoint) {
+    protected void rejectConnection(final Endpoint endpoint) {
         Nearby.Connections.rejectConnection(mGoogleApiClient, endpoint.getId())
                 .setResultCallback(
                         new ResultCallback<Status>() {
@@ -993,7 +949,7 @@ public class ConnectManageService extends Service implements
                                                     "rejectConnection failed. %s", ConnectManageService.toString(status)
                                             )
                                     );
-                                    builder.setContentText("rejectConnection: rejectConnection failed.");
+                                    builder.setContentText("rejectConnection: failed." + endpoint.getName());
                                     mNM.notify(1, builder.build());
                                 }
                             }
@@ -1008,6 +964,8 @@ public class ConnectManageService extends Service implements
     /** Discoverモードが正常に開始した。このメソッドをオーバーライドして、イベントを処理する。 */
     protected void onDiscoveryStarted() {
         Log.d(TAG,"onDiscoveryStarted");
+        builder.setContentText("Discovering started");
+        mNM.notify(1, builder.build());
     }
 
     /** Discoveryモードの開始に失敗した。このメソッドをオーバーライドして、イベントを処理する。 */
@@ -1022,12 +980,8 @@ public class ConnectManageService extends Service implements
      */
     protected void startWaitByDiscovering() {
         Log.d(TAG,"startWaitByDiscovering");
-        builder.setContentText("startWaitByDiscovering");
-        mNM.notify(1, builder.build());
-
         mIsDiscovering = true;
         mDiscoveredEndpoints.clear();
-
         /** Nearby Connections APIによる実際のDiscoveryモード起動 **/
         Nearby.Connections.startDiscovery(
                 mGoogleApiClient,
@@ -1044,7 +998,6 @@ public class ConnectManageService extends Service implements
                         if (getServiceId().equals(info.getServiceId() ) ){
                             // ServiceIdが一致している
                             Log.d(TAG,"onEndpointFound: ServiceId = true");
-
                             // メッセージタイプ取得準備
                             Endpoint endpoint = new Endpoint(endpointId, info.getEndpointName());
                             String typeBuffer = endpoint.getMessageType();
@@ -1118,7 +1071,7 @@ public class ConnectManageService extends Service implements
                     @Override
                     public void onEndpointLost(String endpointId) {
                         Log.w(TAG,String.format("onEndpointLost(endpointId=%s)", endpointId));
-                        builder.setContentText("onEndpointLost");
+                        builder.setContentText("Discover: onEndpointLost " + endpointId);
                         mNM.notify(1, builder.build());
                     }
                 },
@@ -1136,7 +1089,7 @@ public class ConnectManageService extends Service implements
                                             String.format(
                                                     "Discovering failed. Received status%s.",
                                                     ConnectManageService.toString(status) ));
-                                    builder.setContentText("DiscoveryOptions: Discovering failed.");
+                                    builder.setContentText("DiscoveryOptions: failed.");
                                     mNM.notify(1, builder.build());
                                     onDiscoveryFailed();
                                 }
@@ -1156,9 +1109,8 @@ public class ConnectManageService extends Service implements
 
     protected void disconnectFromAllEndpoints() {
         Log.d(TAG,"disconnectFromAllEndpoints");
-        builder.setContentText("disconnectFromAllEndpoints");
-        mNM.notify(1, builder.build());
-
+        //builder.setContentText("disconnectFromAllEndpoints");
+        //mNM.notify(1, builder.build());
         for (Endpoint endpoint : mEstablishedConnections.values()) {
             Nearby.Connections.disconnectFromEndpoint(mGoogleApiClient, endpoint.getId());
         }
@@ -1175,14 +1127,12 @@ public class ConnectManageService extends Service implements
             Log.w(TAG,"Already connecting, so ignoring this endpoint: " + endpoint);
             return;
         }
-        Log.v(TAG,"Sending a connection request to endpoint " + endpoint);
-        builder.setContentText("connectToEndpoint: Sending a connection request to endpoint " + endpoint);
-        mNM.notify(1, builder.build());
-
+        Log.v(TAG,"Sending a connection request to " + endpoint);
         // 自身が接続試行中であることを設定するため、重複して何度も接続をすることはない。
         Log.v(TAG,"mIsConnecting = true");
         mIsConnecting = true;
-
+        builder.setContentText("Request Connection to " + endpoint);
+        mNM.notify(1, builder.build());
         // Nearby Connections APIによる正式な接続要求
         // 接続が確立できた場合はmConnectionLifecycleCallbackへ
         Nearby.Connections.requestConnection(
@@ -1198,7 +1148,7 @@ public class ConnectManageService extends Service implements
                                                     "requestConnection failed. %s", ConnectManageService.toString(status)
                                             )
                                     );
-                                    builder.setContentText("connectToEndpoint: requestConnection failed.");
+                                    builder.setContentText("connectToEndpoint: Request failed.");
                                     mNM.notify(1, builder.build());
                                     Log.v(TAG,"mIsConnecting = false");
                                     mIsConnecting = false;
@@ -1215,9 +1165,6 @@ public class ConnectManageService extends Service implements
      * @param state 次に変化させるdis_State。
      */
     private void setDisState(dis_State state){
-        builder.setContentText("setDisState");
-        mNM.notify(1, builder.build());
-
         Log.d(TAG,"setDisState: to " + state);
         dis_State oldState = mDisState;
         mDisState = state;
@@ -1237,9 +1184,6 @@ public class ConnectManageService extends Service implements
      */
     private void onDisStateChanged(dis_State oldState, dis_State newState) {
         Log.d(TAG, "onDisStateChanged");
-        builder.setContentText("onDisStateChanged");
-        mNM.notify(1, builder.build());
-
         switch (newState) {
             case STOP:
                 //TODO: STOPになっていてサービス起動中にコミュニティトークン取得した場合
@@ -1301,9 +1245,6 @@ public class ConnectManageService extends Service implements
      * @param state 次に変化させるadv_State。
      */
     private void setAdvState(adv_State state){
-        builder.setContentText("setAdvState");
-        mNM.notify(1, builder.build());
-
         Log.d(TAG,"setAdvState: to " + state);
         adv_State oldState = mAdvState;
         mAdvState = state;
@@ -1323,9 +1264,6 @@ public class ConnectManageService extends Service implements
      */
     private void onAdvStateChanged(adv_State oldState, adv_State newState) {
         Log.d(TAG, "onAdvStateChanged");
-        builder.setContentText("onAdvStateChanged");
-        mNM.notify(1, builder.build());
-
         // Adv_Stateに関する通知を切り替え、
         switch (newState) {
             case STOP:
@@ -1391,6 +1329,8 @@ public class ConnectManageService extends Service implements
      */
     protected void onReceiveByDiscoverer(Endpoint endpoint, Payload payload){
         Log.d(TAG, "onPayloadReceivedByDiscoverer");
+        builder.setContentText( "message received from " + endpoint.getName() );
+        mNM.notify(1, builder.build());
         // メッセージ受信(Payload変換)
         receivedPayload = new ReceivedPayload(payload);
         //TODO: シークエンス番号を比較してpayloadのほうが古かったらpayloadを破棄する
@@ -1471,6 +1411,8 @@ public class ConnectManageService extends Service implements
             String payloadStr = new String( payload.asBytes() ); // Payloadをbyte型配列経由でString型に変換
             //その中身は自分が送ったものと一致するか？
             if(messageStr.equals(payloadStr)) {
+                builder.setContentText( "Confirm reception:" + endpoint.getName() );
+                mNM.notify(1, builder.build());
                 //送ったメッセージと送り返されたメッセージとが一致すると判明したら、通信を切断する
                 Log.d(TAG, "onReceiveByAdvertiser: sendingPayload == (received)payload");
                 setAdvState(adv_State.STOP); //Advertiseは次に送るべきものが出てくるまで終了
@@ -1484,6 +1426,7 @@ public class ConnectManageService extends Service implements
             }else{
                 //送ったメールと送り返されたメッセージとが一致しない
                 Log.w(TAG, "onReceiveByAdvertiser: sendingPayload != (received)payload");
+                //TODO: 再送するべきなのでは？
             }
         }else{
             Log.w(TAG, "onReceiveByAdvertiser: mIsReceiving != false");

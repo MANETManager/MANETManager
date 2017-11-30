@@ -63,7 +63,21 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        FacebookSdk.sdkInitialize(getApplicationContext());
+
+        try {
+            PackageInfo info = getPackageManager().getPackageInfo(
+                    "com.example.koichi.manetmanager",
+                    PackageManager.GET_SIGNATURES);
+            for (Signature signature : info.signatures) {
+                MessageDigest md = MessageDigest.getInstance("SHA");
+                md.update(signature.toByteArray());
+                Log.d("KeyHash:", Base64.encodeToString(md.digest(), Base64.DEFAULT));
+            }
+        } catch (PackageManager.NameNotFoundException e) {
+
+        } catch (NoSuchAlgorithmException e) {
+
+        }
 
         setContentView(R.layout.activity_main);
 
@@ -76,7 +90,6 @@ public class MainActivity extends AppCompatActivity {
         authentication_Button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                //TODO: Facebookへの手動ログイン実装
                 //ユーザー名とパスワードの取得
                 value_username = (EditText)findViewById(R.id.value_username);
                 value_password = (EditText)findViewById(R.id.value_password);
