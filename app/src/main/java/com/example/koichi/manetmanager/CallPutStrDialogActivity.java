@@ -87,9 +87,6 @@ public class CallPutStrDialogActivity extends Activity {
                         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
                         intent.addCategory(Intent.CATEGORY_OPENABLE); //開けるファイルに絞る
                         intent.setType("image/*"); //MIMEデータタイプで画像に絞る
-                        /*if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                            intent.putExtra(Intent.EXTRA_MIME_TYPES, types.toArray());
-                        }*/
                         Log.d(TAG, "CallPutStrDialogActivity: now start to choose");
                         startActivityForResult(intent, CallPutStrDialogActivity.REQUEST_CODE_CHOOSER);
                     }

@@ -1,9 +1,7 @@
 package com.example.koichi.manetmanager;
-import android.app.AlertDialog;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
-import android.content.ContentResolver;
 import android.content.Intent;
 import android.graphics.Color;
 import android.net.ConnectivityManager;
@@ -15,11 +13,9 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
-import android.service.autofill.FillEventHistory;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.content.ContextCompat;
-import android.support.v4.content.FileProvider;
 import android.util.Log;
 import android.widget.Toast;
 import com.google.android.gms.common.ConnectionResult;
@@ -52,8 +48,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
-import static com.google.android.gms.nearby.connection.Payload.Type.FILE;
-import static java.lang.Integer.BYTES;
 import static java.lang.Integer.parseInt;
 
 public class ConnectManageService extends Service implements
@@ -160,7 +154,7 @@ public class ConnectManageService extends Service implements
     private ReceivedPayload receivedPayload;
 
     private SendingPayload sendingPayload;
-    private Payload PictPayload;
+    private Payload pictPayload;
 
     private static String messageBuffer;
     private Uri pictMessage;
@@ -270,6 +264,7 @@ public class ConnectManageService extends Service implements
                     Log.d(TAG,
                             String.format(
                                     "onPayloadTransferUpdateByDiscoverer(endpointId=%s, update=%s)", endpointId, update));
+                    //TODO ここのupdate.getState()が1になったときにPayloadを実際に処理するようにしないと画像取得できないことがある
                 }
             };
 
@@ -406,6 +401,7 @@ public class ConnectManageService extends Service implements
                 case "pictMessage":
                     //TODO:CallPutDialogActivityから画像を受け取る
                     pictMessage = intent.getData();
+                    Log.d(TAG,"pictMessage: " + pictMessage.toString());
                     //デスティネーションアドレスがKeyの経路表は存在するか？
                     if(mRouteLists.containsKey( mDestinationAddress ) ){
                         //SENDメッセージ送信準備
@@ -420,10 +416,13 @@ public class ConnectManageService extends Service implements
                         Log.d(TAG, "onStartCommand: mode RREQ");
                         createRREQMessage();
                     }
+                    break;
                 default:
                     Log.e(TAG, "onStartCommand: cmd Intent cannot understood command:" + intent.getStringExtra("cmd") );
                     break;
             }
+        }else{
+            Log.d(TAG, "onStartCommand: there is no command");
         }
         /** このreturn値によってサービスが停止しても再起動が行われる
          * （終了前のintentが保持されていてonStartCommandに再度渡される） */
@@ -630,10 +629,11 @@ public class ConnectManageService extends Service implements
         //もしもadv_Stateが有効である(STOP以外)
         if(mAdvState != adv_State.STOP){
             //adv_Stateが有効 = 何か送りたいPayloadがあるので、それを送る
-
-            //もしもPictPayloadの中身が存在するなら、先に送信する
-            if(PictPayload != null){
-                Nearby.Connections.sendPayload( mGoogleApiClient,endpoint.getId(), PictPayload )
+            //TODO: もしもPictPayloadの中身が存在するなら、先に送信する
+            //Log.d(TAG,"pictPayload: " + pictPayload.asFile().getSize());
+            if(pictPayload != null){
+                Log.d(TAG, "have pictpayload");
+                Nearby.Connections.sendPayload( mGoogleApiClient,endpoint.getId(), pictPayload)
                         .setResultCallback(
                                 new ResultCallback<Status>() {
                                     @Override
@@ -642,42 +642,46 @@ public class ConnectManageService extends Service implements
                                             //sendPayloadの送信に失敗したとき
                                             Log.w(TAG,
                                                     String.format(
-                                                            "PictPayload failed. %s",
+                                                            "pictPayload failed. %s",
                                                             ConnectManageService.toString(status)
                                                     )
                                             );
-                                            builder.setContentText("onEndpointConnected: PictPayload failed.");
+                                            builder.setContentText("onEndpointConnected: pictPayload failed.");
                                             mNM.notify(1, builder.build());
                                         }
                                     }
                                 }
                         )
                 ;
-            }
-            Nearby.Connections.sendPayload( mGoogleApiClient,endpoint.getId(), sendingPayload.getPayload() )
-                    .setResultCallback(
-                            new ResultCallback<Status>() {
-                                @Override
-                                public void onResult(@NonNull Status status) {
-                                    if (!status.isSuccess()) {
-                                        //sendPayloadの送信に失敗したとき
-                                        Log.w(TAG,
-                                                String.format(
-                                                        "sendPayload failed. %s",
-                                                        ConnectManageService.toString(status)
-                                                )
-                                        );
-                                        builder.setContentText("onEndpointConnected: sendPayload failed.");
-                                        mNM.notify(1, builder.build());
-                                    }else{
-                                        //sendPayloadの送信に成功したとき
-                                        mIsReceiving = true;
-                                        // この後、Advertiserがこちらの送信に反応して切断するまで待機
+            }else{
+                Log.d(TAG,String.format("send payload"));
+                //ByteのPayloadによるMessageを送信する
+                Nearby.Connections.sendPayload( mGoogleApiClient,endpoint.getId(), sendingPayload.getPayload() )
+                        .setResultCallback(
+                                new ResultCallback<Status>() {
+                                    @Override
+                                    public void onResult(@NonNull Status status) {
+                                        if (!status.isSuccess()) {
+                                            //sendPayloadの送信に失敗したとき
+                                            Log.w(TAG,
+                                                    String.format(
+                                                            "sendPayload failed. %s",
+                                                            ConnectManageService.toString(status)
+                                                    )
+                                            );
+                                            builder.setContentText("onEndpointConnected: sendPayload failed.");
+                                            mNM.notify(1, builder.build());
+                                        }else{
+                                            Log.d(TAG,String.format("mIsReceiving = true"));
+                                            //sendPayloadの送信に成功したとき
+                                            mIsReceiving = true;
+                                            // この後、Advertiserがこちらの送信に反応して切断するまで待機
+                                        }
                                     }
                                 }
-                            }
-                    )
-            ;
+                        )
+                ;
+            }
         }
     }
 
@@ -786,12 +790,25 @@ public class ConnectManageService extends Service implements
                                     parseInt( receivedPayload.getST(3) ) + 1,
                                     endpoint.getName(),
                                     3600) );
-                    // SENDメッセージを作成する。
-                    createSENDMessage( receivedPayload.st[2] );
+
+                    if(pictMessage != null){
+                        try {
+                            createSENDPictMessage( receivedPayload.st[2], pictMessage );
+                        } catch (FileNotFoundException e) {
+                            e.printStackTrace();
+                        }
+                    }else{
+                        createSENDMessage( receivedPayload.st[2] );
+                    }
                     break;
                 case DELIVER:
                     Log.d(TAG,"onEndpointDisconnected: I am DELIVERNode");
                     ArrayList<Accounts> accountList = common.getAccountGroup();
+
+                    if(pictPayload != null) {
+                        pictMessage = Uri.fromFile(pictPayload.asFile().asJavaFile());
+                    }
+
                     // SENDメッセージを受け取っている + 自分がソースノードもしくはデスティネーションノードか？
                     if( receivedPayload != null && receivedPayload.getST(0).equals( "4" )
                             && mDestinationAddress.equals(mName)
@@ -802,24 +819,28 @@ public class ConnectManageService extends Service implements
                         Log.d(TAG,receivedPayload.getST(0));
                         Log.d(TAG,accountList.get(common.getListIndex()).getSourceAddress());
 
-                        //TODO: サービスからDialogを呼び出せないので専用のActivityに投げる
-                        /*new AlertDialog.Builder(ConnectManageService.this)
-                                .setTitle("TextMessage")
-                                .setMessage( receivedPayload.getST(6) )
-                                .setPositiveButton("OK", null)
-                                .show();*/
-
+                        //サービスからDialogを呼び出せないので専用のActivityに投げる
                         Intent i = new Intent(ConnectManageService.this, CallDialogActivity.class);
                         i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP)
                                 .putExtra("textMessage", receivedPayload.getST(6) );
+                        if(pictPayload != null){
+                            Uri uri = Uri.fromFile( pictPayload.asFile().asJavaFile() );
+                            i.setData(uri);
+                        }
                         getApplicationContext().startActivity(i);
-
                         // メッセージ受信完了。念のためにAdvertiseを終了する
                         setDisState(dis_State.NORMAL);
                         setAdvState(adv_State.STOP);
                     }else{
                         // SENDメッセージを作成する。
-                        createSENDMessage( receivedPayload.st[2] );
+                        if(pictPayload == null)
+                            createSENDMessage( receivedPayload.st[2] );
+                        else
+                            try {
+                                createSENDPictMessage( receivedPayload.st[2], pictMessage );
+                            } catch (FileNotFoundException e) {
+                                e.printStackTrace();
+                            }
                     }
                     break;
                 default:
@@ -1270,7 +1291,6 @@ public class ConnectManageService extends Service implements
                 disBuilder.setContentText("CONNECTED")
                         .setColor( Color.argb(255, 0, 255, 0) );
                 mNM.notify(2, disBuilder.build());
-
                 stopWaitByDiscovering();
                 stopAdvertising();
                 break;
@@ -1368,100 +1388,169 @@ public class ConnectManageService extends Service implements
      * @param payload （送信者から送られてきた）データ。
      */
     protected void onReceiveByDiscoverer(Endpoint endpoint, Payload payload){
-        Log.d(TAG, "onPayloadReceivedByDiscoverer");
+
         builder.setContentText( "message received from " + endpoint.getName() );
         mNM.notify(1, builder.build());
-
-        if(payload.getType() == BYTES){
-            // メッセージ受信(Payload変換)
-            receivedPayload = new ReceivedPayload(payload);
-            //TODO: シークエンス番号を比較してpayloadのほうが古かったらpayloadを破棄する
-            /**
-             * 宛先ノードに関するシーケンス番号が最新であることを確認するため，
-             * ノードは現在のシーケンス番号の数値を，受信したメッセージのシーケンス番号と比較する.
-             * 受信したメッセージのシーケンス番号から現在のシーケンス番号を引いた値が0未満である場合，
-             * 受信したシーケンス番号は古い情報であるため，メッセージの宛先ノードに関する情報は破棄される.
-             */
-            // メッセージ全体のうち1つ目のトークンのString値によってメッセージ内容を判別
-            if(receivedPayload.getST(0) == null){
-                Log.d(TAG, "onPayloadReceivedByDiscoverer: messageJudge is Null!");
-            }else switch (receivedPayload.getST(0)){
-                case "1":
-                case "2":
-                    /**
-                     * RREQ/RREPの場合
-                     * RREQメッセージに指定されている送信先へのアクティブな経路を自分が持っていて
-                     * （ if(mRouteLists.get(st[4]) != null) ）、
-                     * 自身の有効な送信先（終点）シーケンス番号がRREQメッセージの送信先（終点）シーケンス番号以上
-                     * （ if(mRouteLists.get(st[4]).getSeqNum() >= parseInt(st[3]) ) ）
-                     * ならば、RREQを送ってきた相手に対してRREPを送信する。
-                     * そのRREPメッセージのホップ数や送信先シーケンス番号は、
-                     * そのノードの経路表のエントリーからコピーしてくる。
-                     **/
-                    // RREQを受け取った&&指定されている終点アドレスへの経路表を自分は持っているか？
-                    if(receivedPayload.getST(0) == "1" && mRouteLists.get(receivedPayload.getST(2)) != null){
-                        // 自分の経路表の有効な終点シーケンス番号が受け取ったRREQの終点シーケンス番号以上か？
-                        if(mRouteLists.get(receivedPayload.getST(2)).getSeqNum() >= parseInt(receivedPayload.getST(3)) ){
-                            Log.d(TAG, "onPayloadReceivedByDiscoverer: RREQの終点アドレスへの経路表を持っている");
-                            //TODO: 受け取ったRREQを基にしたRREPメッセージを送り返す
-                            break;
+        switch(payload.getType()){
+            case 1:
+                Log.d(TAG, "BYTES");
+                // メッセージ受信(Payload変換)
+                receivedPayload = new ReceivedPayload(payload);
+                //TODO: シークエンス番号を比較してpayloadのほうが古かったらpayloadを破棄する
+                /**
+                 * 宛先ノードに関するシーケンス番号が最新であることを確認するため，
+                 * ノードは現在のシーケンス番号の数値を，受信したメッセージのシーケンス番号と比較する.
+                 * 受信したメッセージのシーケンス番号から現在のシーケンス番号を引いた値が0未満である場合，
+                 * 受信したシーケンス番号は古い情報であるため，メッセージの宛先ノードに関する情報は破棄される.
+                 */
+                // メッセージ全体のうち1つ目のトークンのString値によってメッセージ内容を判別
+                if(receivedPayload.getST(0) == null){
+                    Log.d(TAG, "onPayloadReceivedByDiscoverer: messageJudge is Null!");
+                }else switch (receivedPayload.getST(0)){
+                    case "1":
+                    case "2":
+                        /**
+                         * RREQ/RREPの場合
+                         * RREQメッセージに指定されている送信先へのアクティブな経路を自分が持っていて
+                         * （ if(mRouteLists.get(st[4]) != null) ）、
+                         * 自身の有効な送信先（終点）シーケンス番号がRREQメッセージの送信先（終点）シーケンス番号以上
+                         * （ if(mRouteLists.get(st[4]).getSeqNum() >= parseInt(st[3]) ) ）
+                         * ならば、RREQを送ってきた相手に対してRREPを送信する。
+                         * そのRREPメッセージのホップ数や送信先シーケンス番号は、
+                         * そのノードの経路表のエントリーからコピーしてくる。
+                         **/
+                        // RREQを受け取った&&指定されている終点アドレスへの経路表を自分は持っているか？
+                        if(receivedPayload.getST(0) == "1" && mRouteLists.get(receivedPayload.getST(2)) != null){
+                            // 自分の経路表の有効な終点シーケンス番号が受け取ったRREQの終点シーケンス番号以上か？
+                            if(mRouteLists.get(receivedPayload.getST(2)).getSeqNum() >= parseInt(receivedPayload.getST(3)) ){
+                                Log.d(TAG, "onPayloadReceivedByDiscoverer: RREQの終点アドレスへの経路表を持っている");
+                                //TODO: 受け取ったRREQを基にしたRREPメッセージを送り返す
+                                break;
+                            }
                         }
-                    }
-                    //これ以降はSENDメッセージと同様の動作のため、breakしない
-                case "4":
-                    Log.d(TAG, "onPayloadReceivedByDiscoverer: message will be replied");
-                    // SENDメッセージを受信 → Payloadをそのまま送り返す
-                    Nearby.Connections.sendPayload(mGoogleApiClient,endpoint.getId(),payload)
-                            .setResultCallback(
-                                    new ResultCallback<Status>() {
-                                        @Override
-                                        public void onResult(@NonNull Status status) {
-                                            if (!status.isSuccess()) {
-                                                Log.d(TAG, "Nearby.Connections.sendPayload: mIsReceiving = false");
-                                                //sendPayloadの送信に失敗したとき
-                                                Log.w(TAG,
-                                                        String.format(
-                                                                "sendPayload failed. %s",
-                                                                ConnectManageService.toString(status)
-                                                        )
-                                                );
-                                                builder.setContentText("onReceiveByDiscoverer: sendPayload failed.");
-                                                mNM.notify(1, builder.build());
-                                            }else{
-                                                Log.d(TAG, "Nearby.Connections.sendPayload: mIsReceiving = true");
-                                                //sendPayloadの送信に成功したとき
-                                                mIsReceiving = true;
-                                                // この後、Advertiserがこちらの送信に反応して切断するまで待機
+                        //これ以降はSENDメッセージと同様の動作のため、breakしない
+                    case "4":
+                        Log.d(TAG, "onPayloadReceivedByDiscoverer: message will be replied");
+                        // SENDメッセージを受信 → Payloadをそのまま送り返す
+                        Nearby.Connections.sendPayload(mGoogleApiClient,endpoint.getId(),payload)
+                                .setResultCallback(
+                                        new ResultCallback<Status>() {
+                                            @Override
+                                            public void onResult(@NonNull Status status) {
+                                                if (!status.isSuccess()) {
+                                                    Log.d(TAG, "Nearby.Connections.sendPayload: mIsReceiving = false");
+                                                    //sendPayloadの送信に失敗したとき
+                                                    Log.w(TAG,
+                                                            String.format(
+                                                                    "sendPayload failed. %s",
+                                                                    ConnectManageService.toString(status)
+                                                            )
+                                                    );
+                                                    builder.setContentText("onReceiveByDiscoverer: sendPayload failed.");
+                                                    mNM.notify(1, builder.build());
+                                                }else{
+                                                    Log.d(TAG, "Nearby.Connections.sendPayload: mIsReceiving = true");
+                                                    //sendPayloadの送信に成功したとき
+                                                    mIsReceiving = true;
+                                                    // この後、Advertiserがこちらの送信に反応して切断するまで待機
+                                                }
                                             }
+                                        });
+                        break;
+                    case "3":
+                        //TODO: RERRメッセージだと分かった場合
+                        break;
+                    default:
+                        //fatal exception(全く関係なさそうなメッセージが飛んできた)
+                        Log.e(TAG, String.format("onReceiveByDiscoverer: fatal exception (Unknown messageType)") );
+                }
+                break;
+            case 2:
+                //TODO:FILEのPayloadを受け取った時の動作
+                Log.d(TAG, "FILE");
+                pictPayload = payload;
+                //TODO:次にsendingpayloadを送ってほしいことを相手に伝える
+                // pictメッセージを受信 → "Received"と送り返す
+                Nearby.Connections.sendPayload(mGoogleApiClient,endpoint.getId(),Payload.fromBytes("Received".getBytes()))
+                        .setResultCallback(
+                                new ResultCallback<Status>() {
+                                    @Override
+                                    public void onResult(@NonNull Status status) {
+                                        Log.d(TAG, "Received");
+                                        if (!status.isSuccess()) {
+                                            Log.d(TAG, "Nearby.Connections.sendPayload: mIsReceiving = false");
+                                            //sendPayloadの送信に失敗したとき
+                                            Log.w(TAG,
+                                                    String.format(
+                                                            "sendPayload failed. %s",
+                                                            ConnectManageService.toString(status)
+                                                    )
+                                            );
+                                            builder.setContentText("onReceiveByDiscoverer: sendPayload failed.");
+                                            mNM.notify(1, builder.build());
+                                        }else{
+                                            Log.d(TAG, "Nearby.Connections.sendPayload: mIsReceiving = true");
+                                            //sendPayloadの送信に成功したとき
+                                            mIsReceiving = true;
+                                            // この後、Advertiserがこちらの送信に反応して切断するまで待機
                                         }
-                                    });
-                    break;
-                case "3":
-                    //TODO: RERRメッセージだと分かった場合
-                    break;
-                default:
-                    //fatal exception(全く関係なさそうなメッセージが飛んできた)
-                    Log.e(TAG, String.format("onReceiveByDiscoverer: fatal exception (Unknown messageType)") );
-            }
-        }else if(payload.getType() == FILE){
-            //TODO:FILEのPayloadを受け取った時の動作（返信はしない）
-
+                                    }
+                                });
+                break;
+            default:
+            Log.e(TAG, "onPayloadReceivedByDiscoverer: Payload.getType() Error");
         }
-
     }
 
     protected void onReceiveByAdvertiser(Endpoint endpoint, Payload payload) {
         Log.d(TAG, "onReceiveByAdvertiser");
-        //自分からメッセージ送信済か？
-        if(mIsReceiving = true){
+        //"Received"のpayloadを受け取ったか？or自分からメッセージ送信済か？
+
+        if("Received".equals(new String( payload.asBytes() ) ) )
+        {
+            //相手がpictを受信したので、次はBytesのメッセージを送る
+            Log.d(TAG,String.format("onReceiveByAdvertiser: Received"));
+            //ByteのPayloadによるMessageを送信する
+            Nearby.Connections.sendPayload( mGoogleApiClient,endpoint.getId(), sendingPayload.getPayload() )
+                    .setResultCallback(
+                            new ResultCallback<Status>() {
+                                @Override
+                                public void onResult(@NonNull Status status) {
+                                    if (!status.isSuccess()) {
+                                        //sendPayloadの送信に失敗したとき
+                                        Log.w(TAG,
+                                                String.format(
+                                                        "sendPayload failed. %s",
+                                                        ConnectManageService.toString(status)
+                                                )
+                                        );
+                                        builder.setContentText("onReceiveByAdvertiser: sendPayload failed.");
+                                        mNM.notify(1, builder.build());
+                                    }else{
+                                        Log.d(TAG,String.format("mIsReceiving = true"));
+                                        //sendPayloadの送信に成功したとき
+                                        mIsReceiving = true;
+                                        // この後、Advertiserがこちらの送信に反応して切断するまで待機
+                                    }
+                                }
+                            }
+                    )
+            ;
+        }else if(mIsReceiving = true){
             String messageStr = new String( sendingPayload.getPayload().asBytes() ); // Payloadをbyte型配列経由でString型に変換
             String payloadStr = new String( payload.asBytes() ); // Payloadをbyte型配列経由でString型に変換
             //その中身は自分が送ったものと一致するか？
             if(messageStr.equals(payloadStr)) {
+                //送ったメッセージと送り返されたメッセージとが一致すると判明したら、通信を切断する
                 builder.setContentText( "Confirm reception:" + endpoint.getName() );
                 mNM.notify(1, builder.build());
-                //送ったメッセージと送り返されたメッセージとが一致すると判明したら、通信を切断する
                 Log.d(TAG, "onReceiveByAdvertiser: sendingPayload == (received)payload");
+
+                if("4".equals( sendingPayload.getMessageType()) || "3".equals( sendingPayload.getMessageType()) ){
+                    pictPayload = null;
+                    pictMessage = null;
+                }
+
                 setAdvState(adv_State.STOP); //Advertiseは次に送るべきものが出てくるまで終了
                 setDisState(dis_State.NORMAL); //Discoverを始める
 
@@ -1815,12 +1904,14 @@ public class ConnectManageService extends Service implements
 
     // onStartCommand()メソッドなどによるSEND新規作成時のメソッド
     public void createSENDPictMessage(String targetAddress, Uri sendPict) throws FileNotFoundException {
+        Log.d(TAG,"createSENDPictMessage ");
         sendingPayload
                 = new SendingPayload( "4", targetAddress,"0",
-                mName,"1", messageBuffer );
+                mName,"1", "pictMessage" );
         ParcelFileDescriptor parcelFileDescriptor =
                 getContentResolver().openFileDescriptor(sendPict, "r");
-        PictPayload = Payload.fromFile( parcelFileDescriptor );
+        pictPayload = Payload.fromFile( parcelFileDescriptor );
+        Log.d(TAG,"pictPayload: " + pictPayload.getType());
 
         // 経路構築完了状態へ移行
         setDisState(dis_State.SUSPEND);
