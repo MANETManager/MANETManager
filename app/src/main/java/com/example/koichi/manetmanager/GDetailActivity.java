@@ -311,6 +311,9 @@ public class GDetailActivity extends AppCompatActivity {
                                 //messageデータを持っていない書き込み情報オブジェクトを排除する
                                 if(groupObject[i].has("message") == true) {
                                     // (i+1)番目の書き込みについて処理を行う
+                                    // postIdを取得（削除可能にするため）
+                                    postid = groupObject[i].getString("id");
+
                                     // 書き込みのメッセージを取得
                                     String message = groupObject[i].getString("message");
 

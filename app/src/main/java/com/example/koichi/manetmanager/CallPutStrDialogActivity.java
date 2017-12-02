@@ -5,12 +5,15 @@ import android.app.AlertDialog;
 import android.app.PendingIntent;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
+import android.provider.DocumentsContract;
+import android.provider.MediaStore;
 import android.support.v7.app.AppCompatActivity;
 import android.telecom.Call;
 import android.util.Log;
@@ -18,6 +21,7 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.Toast;
 
+import java.io.File;
 import java.io.FileDescriptor;
 import java.io.IOException;
 import java.util.Collections;
@@ -84,11 +88,17 @@ public class CallPutStrDialogActivity extends Activity {
                     public void onClick(DialogInterface dialogInterface, int i) {
                         //Pictureを送りたい、送る画像は利用者が端末内から選べるようにする
                         //まずはインテントで外部アプリを起動する
-                        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-                        intent.addCategory(Intent.CATEGORY_OPENABLE); //開けるファイルに絞る
-                        intent.setType("image/*"); //MIMEデータタイプで画像に絞る
                         Log.d(TAG, "CallPutStrDialogActivity: now start to choose");
-                        startActivityForResult(intent, CallPutStrDialogActivity.REQUEST_CODE_CHOOSER);
+                        if (Build.VERSION.SDK_INT < 19) {
+                            Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+                            intent.setType("image/*");
+                            startActivityForResult(Intent.createChooser(intent,"Pick a source"),0);
+                        }else{
+                            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                            intent.addCategory(Intent.CATEGORY_OPENABLE); //開けるファイルに絞る
+                            intent.setType("image/*"); //MIMEデータタイプで画像に絞る
+                            startActivityForResult(Intent.createChooser(intent,"Pick a source"),1);
+                        }
                     }
                 })
                 .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
@@ -106,15 +116,16 @@ public class CallPutStrDialogActivity extends Activity {
     /* CallPutStrDialogActivity経由で外部アプリから画像を選択したうえでIntentが飛ばされて起動 */
     @Override
     protected void onActivityResult(int requestCode, int resultCode, final Intent data) {
+        if(resultCode != RESULT_OK) return;
         ImageView selectedImage = new ImageView(this);
 
         Log.d(TAG, "CallPutPicDialogActivity");
-        if(requestCode == CallPutStrDialogActivity.REQUEST_CODE_CHOOSER && resultCode == RESULT_OK)
+        if(requestCode == CallPutStrDialogActivity.REQUEST_CODE_CHOOSER)
         {
-            Log.d(TAG, "get Picture");
             Uri uri = null;
             if(data != null){
                 uri = data.getData();
+                Log.d(TAG, "get Picture: " + uri.toString() );
                 try {
                     Bitmap bmp = getBitmapFromUri(uri);
                     selectedImage.setImageBitmap(bmp);
