@@ -199,6 +199,11 @@ public class ConnectManageService extends Service implements
      */
     private boolean mIsReceiving = false;
 
+    /**
+     * 自端末のシーケンス番号。
+     */
+    //private int mSequenceNum = 0;
+
     private final static String TAG = "ConnectManageService";
 
     /*
@@ -563,7 +568,10 @@ public class ConnectManageService extends Service implements
                         }else{
                             //それ以外
                             Log.d(TAG, "onConnectionInitiated: I'm Discoverer & Destination Node, but have no Network");
-                            rejectConnection(endpoint);
+                            //TODO:評価実験のためrejectしないようにする
+                            //rejectConnection(endpoint);
+                            myRole = isMyRole.DESTIN;
+                            acceptConnectionByDiscoverer(endpoint);
                         }
                     }else{
                         ArrayList<Accounts> accountList = common.getAccountGroup();
@@ -706,9 +714,9 @@ public class ConnectManageService extends Service implements
                                             builder.setContentText("onEndpointConnected: sendPayload failed.");
                                             mNM.notify(1, builder.build());
                                         }else{
+                                            mIsReceiving = true;
                                             Log.d(TAG,String.format("mIsReceiving = true"));
                                             //sendPayloadの送信に成功したとき
-                                            mIsReceiving = true;
                                             // この後、Advertiserがこちらの送信に反応して切断するまで待機
                                         }
                                     }
@@ -1488,9 +1496,9 @@ public class ConnectManageService extends Service implements
                                             builder.setContentText("onReceiveByDiscoverer: sendPayload failed.");
                                             mNM.notify(1, builder.build());
                                         }else{
+                                            mIsReceiving = true;
                                             Log.d(TAG, "Nearby.Connections.sendPayload: mIsReceiving = true");
                                             //sendPayloadの送信に成功したとき
-                                            mIsReceiving = true;
                                             // この後、Advertiserがこちらの送信に反応して切断するまで待機
                                         }
                                     }
@@ -1562,9 +1570,9 @@ public class ConnectManageService extends Service implements
                                         builder.setContentText("onReceiveByAdvertiser: sendPayload failed.");
                                         mNM.notify(1, builder.build());
                                     }else{
+                                        mIsReceiving = true;
                                         Log.d(TAG,String.format("mIsReceiving = true"));
                                         //sendPayloadの送信に成功したとき
-                                        mIsReceiving = true;
                                     }
                                 }
                             }

@@ -92,12 +92,12 @@ public class CallPutStrDialogActivity extends Activity {
                         if (Build.VERSION.SDK_INT < 19) {
                             Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
                             intent.setType("image/*");
-                            startActivityForResult(Intent.createChooser(intent,"Pick a source"),0);
+                            startActivityForResult(Intent.createChooser(intent,"Pick a source"),CallPutStrDialogActivity.REQUEST_CODE_CHOOSER);
                         }else{
                             Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
                             intent.addCategory(Intent.CATEGORY_OPENABLE); //開けるファイルに絞る
                             intent.setType("image/*"); //MIMEデータタイプで画像に絞る
-                            startActivityForResult(Intent.createChooser(intent,"Pick a source"),1);
+                            startActivityForResult(Intent.createChooser(intent,"Pick a source"),CallPutStrDialogActivity.REQUEST_CODE_CHOOSER);
                         }
                     }
                 })
