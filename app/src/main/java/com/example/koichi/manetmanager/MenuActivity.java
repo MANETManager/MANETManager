@@ -63,7 +63,6 @@ public class MenuActivity extends AppCompatActivity {
             public void onClick(View v) {
                 Intent intent = new Intent(getApplication(), SettingActivity.class);
                 startActivity(intent);
-
             }
         });
 
@@ -74,24 +73,6 @@ public class MenuActivity extends AppCompatActivity {
             public void onClick(View v) {
                 common = (Common) MenuActivity.this.getApplication();
                 Toast.makeText(MenuActivity.this, "common.MACaddress: " + common, Toast.LENGTH_LONG).show();
-                /*
-                switch (v.getId()) {
-                    case R.id.btnGraphApiTest:
-                        // Graph API自体がネットワーク接続を考慮しようとしないので別途チェック
-                        if(netWorkCheck( getApplication() ) ){
-                            GraphApiTest();
-                            break;
-                        }else{
-                            // ネットワーク接続が確認できなければボタンによる動作を実行しない
-                            Toast.makeText(MenuActivity.this,
-                                    "インターネットへの接続が必要です", Toast.LENGTH_LONG).show();
-                            break;
-                        }
-                    default:
-
-                }
-                :
-               */
             }
         });
 
@@ -109,10 +90,6 @@ public class MenuActivity extends AppCompatActivity {
     }
 
     private void GraphApiTest() {
-        /*
-        Bundle params = new Bundle();
-        params.putString("message", "This is a test message");
-        */
         //GET
         GraphRequestAsyncTask graphRequestAsyncTask = new GraphRequest(
                 AccessToken.getCurrentAccessToken(),
@@ -123,8 +100,6 @@ public class MenuActivity extends AppCompatActivity {
                     public void onCompleted(GraphResponse response) {
                         // TextView 表示用のテキストバッファ
                         StringBuffer stringBuffer = new StringBuffer();
-
-                        // Log.i(TAG, response.getJSONObject().toString());
 
                         try {
                             //jsonオブジェクトを生成
@@ -137,9 +112,6 @@ public class MenuActivity extends AppCompatActivity {
                             for (int i=0; i<count; i++){
                                 groupObject[i] = itemArray.getJSONObject(i);
                             }
-
-                            // JSON 形式データ文字列にインデントを加えた形に成形
-                            //parsedText = FBjson.toString(4);
 
                             // data配列の書き込み情報オブジェクト群のうちmessageデータを取り出す
                             for (int i=0; i<groupObject.length; i++){
@@ -159,7 +131,6 @@ public class MenuActivity extends AppCompatActivity {
                                     // 書き込みにメッセージが存在しないのでスルーする
                                 }
                             }
-
                         } catch (JSONException e) {
                             //例外処理
                             e.printStackTrace();
@@ -175,5 +146,4 @@ public class MenuActivity extends AppCompatActivity {
                 }
         ).executeAsync();
     }
-
 }

@@ -634,5 +634,4 @@ public class GDetailActivity extends AppCompatActivity {
         // ConnectManageService(NearbyConnections)を起動する
         startService(new Intent(getBaseContext(),ConnectManageService.class));
     }
-
 }

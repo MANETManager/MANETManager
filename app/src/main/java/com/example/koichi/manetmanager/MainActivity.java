@@ -68,23 +68,13 @@ public class MainActivity extends AppCompatActivity {
             PackageInfo info = getPackageManager().getPackageInfo(
                     "com.example.koichi.manetmanager",
                     PackageManager.GET_SIGNATURES);
-            for (Signature signature : info.signatures) {
-                MessageDigest md = MessageDigest.getInstance("SHA");
-                md.update(signature.toByteArray());
-                Log.d("KeyHash:", Base64.encodeToString(md.digest(), Base64.DEFAULT));
-            }
         } catch (PackageManager.NameNotFoundException e) {
 
-        } catch (NoSuchAlgorithmException e) {
-
         }
-
         setContentView(R.layout.activity_main);
 
         //commonクラスで宣言したグローバル関数の取得
         common = (Common)this.getApplication();
-
-
         //ユーザー名とパスワード認証
         Button authentication_Button = (Button) findViewById(R.id.authentication);
         authentication_Button.setOnClickListener(new View.OnClickListener() {
@@ -151,7 +141,6 @@ public class MainActivity extends AppCompatActivity {
                 startActivity(intent);
             }
         });
-
 
         //FB認証
         /*ログインボタン設置、要求するパーミッションの設定*/

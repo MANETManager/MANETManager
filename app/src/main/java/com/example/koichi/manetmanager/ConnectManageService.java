@@ -341,7 +341,6 @@ public class ConnectManageService extends Service implements
                 }
             };
 
-
     @Override
     public IBinder onBind(Intent intent) {
         return null;
@@ -1976,7 +1975,5 @@ public class ConnectManageService extends Service implements
         Log.d(TAG, "isRouteMapHaveNextHopAdd: Return false");
         return false;
     }
-
     //TODO: 自端末のMBODを減少させるメソッドが要る？
-
 }

@@ -64,6 +64,4 @@ public class Accounts {
         mbod = 0;
         macAddress = null;
     }
-
-
 }

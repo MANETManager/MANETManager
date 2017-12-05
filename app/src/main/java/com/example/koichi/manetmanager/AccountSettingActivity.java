@@ -28,7 +28,6 @@ public class AccountSettingActivity extends AppCompatActivity {
         SharedPreferences accounts = getSharedPreferences("accounts", Context.MODE_PRIVATE);
         accountList = gson.fromJson(accounts.getString("accountJson", null), new TypeToken<ArrayList<Accounts>>(){}.getType());
 
-
         final ArrayList<String> items = new ArrayList<>();
 
         if(accountList != null) {
@@ -42,7 +41,6 @@ public class AccountSettingActivity extends AppCompatActivity {
 
         // itemを表示するTextViewが設定されているlist.xmlを指す
         final ArrayAdapter<String> arrayAdapter = new ArrayAdapter<String>(this, R.layout.list_item, items);
-
 
         // adapterをListViewにセット
         listView.setEmptyView(findViewById(R.id.emptyView));
@@ -88,17 +86,11 @@ public class AccountSettingActivity extends AppCompatActivity {
             }
 
         });
-
-
-
         Button back_Button = (Button) findViewById(R.id.back);
         back_Button.setOnClickListener(new View.OnClickListener(){
             public void  onClick(View v){
                 finish();
             }
         });
-
-
-
     }
 }
