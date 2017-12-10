@@ -42,7 +42,7 @@ public class GroupActivity extends AppCompatActivity {
     String [] group_name = new String[group_MAX];
     String [] group_id = new String[group_MAX];
     Button btnGroup[]; //ボタン:メンバー変数
-    private static final String TAG = "GroupActivity";
+    private static final String TAG = "SocialDTNManager";
 
     private Common common;
 

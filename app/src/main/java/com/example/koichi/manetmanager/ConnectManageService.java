@@ -205,7 +205,7 @@ public class ConnectManageService extends Service implements
      */
     //private int mSequenceNum = 0;
 
-    private final static String TAG = "ConnectManageService";
+    private final static String TAG = "SocialDTNManager";
 
     /*
      * デスティネーションノードのアドレス、今回の研究では固定値となる
@@ -394,8 +394,12 @@ public class ConnectManageService extends Service implements
 
         /* 通知押下時に、MainActivityのonStartCommandを呼び出すためのintent */
         //ここではCallPutStrDialogActivityを起動させるためのインテントになる
-        Intent notificationIntent = new Intent(this, ConnectManageService.class).putExtra("cmd", "putMessage");
-        PendingIntent pendingIntent = PendingIntent.getService(this, 0, notificationIntent, 0);
+        Intent notificationIntent1 = new Intent(this, ConnectManageService.class).putExtra("cmd", "putMessage");
+        PendingIntent pendingIntent1 = PendingIntent.getService(this, 0, notificationIntent1, 0);
+        Intent notificationIntent2 = new Intent(this, ConnectManageService.class).putExtra("cmd", "resetMessage");
+        PendingIntent pendingIntent2 = PendingIntent.getService(this, 1, notificationIntent2, 0);
+        Intent notificationIntent3 = new Intent(this, ConnectManageService.class).putExtra("cmd", "resetRouteList");
+        PendingIntent pendingIntent3 = PendingIntent.getService(this, 2, notificationIntent3, 0);
         /**
          * サービスを長持ちさせるために通知を作成する
          * setSmallIcon(): 通知のアイコン
@@ -403,10 +407,12 @@ public class ConnectManageService extends Service implements
          * setContentTitle(): 通知に表示する1行目
          * setContentText(): 通知に表示する2行目
          */
-        builder.setContentIntent(pendingIntent)
+        builder.setContentIntent(pendingIntent1)
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
                 .setContentTitle("Social DTN working")
                 .setContentText("onCreate");
+        advBuilder.setContentIntent(pendingIntent2);
+        disBuilder.setContentIntent(pendingIntent3);
         mNM = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         /** 1は通知のID、他の箇所でnotify()を使う際に同じIDを指定すると
          * 複数の通知を表示せず既存の通知を上書きする */
@@ -450,7 +456,7 @@ public class ConnectManageService extends Service implements
                     getApplicationContext().startActivity(i);
                     break;
                 case "pictMessage":
-                    //TODO:CallPutDialogActivityから画像を受け取る
+                    //CallPutDialogActivityから画像を受け取る
                     pictMessage = intent.getData();
                     Log.d(TAG,"pictMessage: " + pictMessage.toString());
                     //デスティネーションアドレスがKeyの経路表は存在するか？
@@ -467,6 +473,26 @@ public class ConnectManageService extends Service implements
                         Log.d(TAG, "onStartCommand: mode RREQ");
                         createRREQMessage();
                     }
+                    break;
+                case "resetMessage":
+                    receivedPayload = null;
+                    sendingPayload = null;
+                    pictPayload = null;
+                    pictMessage = null;
+                    mIsReceiving = false;
+                    setDisState(dis_State.NORMAL);
+                    setAdvState(adv_State.STOP);
+                    Toast.makeText(
+                            this, "Message Variables was Initialized" , Toast.LENGTH_SHORT)
+                            .show();
+                    Log.d(TAG, "---------------------------------------Message Initialized---------------------------------------");
+                    break;
+                case "resetRouteList":
+                    mRouteLists.clear(); //端末の持つ経路表を全て消去
+                    Toast.makeText(
+                            this, "RouteList was Initialized" , Toast.LENGTH_SHORT)
+                            .show();
+                    Log.d(TAG, "--------------------------------------RouteList Initialized--------------------------------------");
                     break;
                 default:
                     Log.e(TAG, "onStartCommand: cmd Intent cannot understood command:" + intent.getStringExtra("cmd") );
@@ -923,19 +949,20 @@ public class ConnectManageService extends Service implements
         builder.setContentText("onConnectionFailed: " + endpoint.getName());
         mNM.notify(1, builder.build());
         //advとdisを停止する（が、条件分岐の都合上Stateには影響させない）
-        stopAdvertising();
-        stopWaitByDiscovering();
+        //stopAdvertising();
+        //stopWaitByDiscovering();
         //依然探索状態であるか？（Discoverができない状況なら再試行する必要がない）
-        if (getDisState() == dis_State.NORMAL) {
+        /*if (getDisState() == dis_State.NORMAL) {
             //（接続先候補を削った場合を含めて）DiscoveredEndpointsマップが空ではないか？
-            if(!getDiscoveredEndpoints().isEmpty()) {
+            if(getDiscoveredEndpoints().size() > 0) {
                 //DiscoveredEndpoints（接続先候補）からランダムに抽出して再試行
-                connectToEndpoint(pickRandomElem(getDiscoveredEndpoints()));
+                connectToEndpoint(pickRandomElem( getDiscoveredEndpoints() ) );
             }else{
                 //Discoverを最初からやり直す
                 setDisState(dis_State.NORMAL);
             }
-        }
+        }*/
+        setDisState(dis_State.NORMAL);
     }
 
     /** @return 現在発見されているエンドポイントのリストを返す。 */
@@ -981,7 +1008,7 @@ public class ConnectManageService extends Service implements
                                                     ConnectManageService.toString( result.getStatus() )
                                             )
                                     );
-                                    builder.setContentText("startAdvertising: Advertising failed.");
+                                    builder.setContentText( ConnectManageService.toString( result.getStatus() ) );
                                     mNM.notify(1, builder.build());
                                     onAdvertisingFailed();
                                 }
@@ -1202,7 +1229,7 @@ public class ConnectManageService extends Service implements
                                             String.format(
                                                     "Discovering failed. Received status%s.",
                                                     ConnectManageService.toString(status) ));
-                                    builder.setContentText("DiscoveryOptions: failed.");
+                                    builder.setContentText( ConnectManageService.toString(status.getStatus()) );
                                     mNM.notify(1, builder.build());
                                     onDiscoveryFailed();
                                 }

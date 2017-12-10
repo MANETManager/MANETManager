@@ -53,7 +53,7 @@ public class GDetailActivity extends AppCompatActivity {
     private Spinner spinner_MB;
     String group_id, group_name, group_tokenid, group_mb, group_saddress, postid;
     int orderOfGroupList;
-    private static final String TAG = "GDetailActivity";
+    private static final String TAG = "SocialDTNManager";
     CallbackManager callbackManager;
     boolean posting = true;
 

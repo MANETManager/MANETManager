@@ -31,7 +31,7 @@ import org.json.JSONObject;
 
 public class MenuActivity extends AppCompatActivity {
 
-    private static final String TAG = "MenuActivity";
+    private static final String TAG = "SocialDTNManager";
     private Common common;
 
     @Override

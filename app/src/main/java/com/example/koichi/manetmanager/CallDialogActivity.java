@@ -20,7 +20,7 @@ import java.io.IOException;
  */
 
 public class CallDialogActivity extends Activity{
-    private final static String TAG = "CallDialogActivity";
+    private final static String TAG = "SocialDTNManager";
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
