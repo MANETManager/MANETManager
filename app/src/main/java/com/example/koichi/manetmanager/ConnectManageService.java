@@ -7,6 +7,8 @@ import android.graphics.Color;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
+import android.os.Build;
+import android.os.Environment;
 import android.os.IBinder;
 import android.Manifest;
 import android.content.Context;
@@ -38,8 +40,11 @@ import com.google.android.gms.nearby.connection.PayloadCallback;
 import com.google.android.gms.nearby.connection.PayloadTransferUpdate;
 import com.google.android.gms.nearby.connection.Strategy;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -420,11 +425,9 @@ public class ConnectManageService extends Service implements
         // サービス永続化
         /** startForeground(): メモリ不足時等の強制終了対象にほぼならなくなる*/
         startForeground(1, builder.build());
-
         if (!mGoogleApiClient.isConnected()) {
             mGoogleApiClient.connect();
         }
-
     }
 
     // サービス開始時
@@ -482,8 +485,9 @@ public class ConnectManageService extends Service implements
                     mIsReceiving = false;
                     setDisState(dis_State.NORMAL);
                     setAdvState(adv_State.STOP);
+                    makeLogcat();
                     Toast.makeText(
-                            this, "Message Variables was Initialized" , Toast.LENGTH_SHORT)
+                            this, "Message Variables was Initialized", Toast.LENGTH_SHORT)
                             .show();
                     Log.d(TAG, "---------------------------------------Message Initialized---------------------------------------");
                     break;
@@ -2001,6 +2005,59 @@ public class ConnectManageService extends Service implements
         //MAPの全てのキーに対応する経路表を調べても一致するアドレスが無かった場合
         Log.d(TAG, "isRouteMapHaveNextHopAdd: Return false");
         return false;
+    }
+
+    public void makeLogcat(){
+        //Logcatを出力するためのファイル名を選定する
+        File filename = new File(Environment.getExternalStorageDirectory() + "/mylog1.txt");
+        int j=1;
+        while ( filename.exists() ) {
+            //もしも（既にファイルが作成されていて）同名のファイルが存在する場合、数字部分をインクリメント
+            j++;
+            filename = new File(Environment.getExternalStorageDirectory() + "/mylog" + j + ".txt");
+        }
+        /**
+         * 被っていないファイル名を確保できたなら、logcatコマンドをオプション付きで実行し
+         * SocialDTNManagerに関するLogcatを取得する
+         */
+        Log.d( TAG, filename.getAbsolutePath() );
+        if(Build.VERSION.SDK_INT > 19)
+        {
+            Process process =null;
+            String cmd = "logcat SocialDTNManager:V *:S -v time -f " + filename.getAbsolutePath() + " -d";
+            try {
+                //filenameにLogcatを出力する
+                process = Runtime.getRuntime().exec(cmd);
+                process.waitFor();
+                process.destroy();
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            Log.d(TAG, "logcat outputted: " + filename.getName());
+            //出力し終わった分のLogcatはクリア（フラッシュ）する
+            try {
+                process = Runtime.getRuntime().exec("logcat -c -d");
+                process.waitFor();
+                process.destroy();
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }else{
+            Process process =null;
+            String cmd = "logcat SocialDTNManager:V *:S -v time -f " + filename.getAbsolutePath() + " -d";
+            try {
+                //filenameにLogcatを出力する
+                process = Runtime.getRuntime().exec(cmd);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            Log.d(TAG, "logcat outputted: " + filename.getName());
+        }
+
     }
     //TODO: 自端末のMBODを減少させるメソッドが要る？
 }

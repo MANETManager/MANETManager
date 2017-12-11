@@ -13,6 +13,8 @@
     <!-- Required for storage R/W -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <!-- Required for Logcat -->
+    <uses-permission android:name="android.permission.READ_LOGS" />
 
     <application
         android:name=".Common"
