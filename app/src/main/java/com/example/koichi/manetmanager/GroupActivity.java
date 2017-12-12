@@ -13,6 +13,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.textservice.TextInfo;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -42,6 +43,7 @@ public class GroupActivity extends AppCompatActivity {
     String [] group_name = new String[group_MAX];
     String [] group_id = new String[group_MAX];
     Button btnGroup[]; //ボタン:メンバー変数
+    private TextView tv_username;
     private static final String TAG = "SocialDTNManager";
 
     private Common common;
@@ -56,6 +58,8 @@ public class GroupActivity extends AppCompatActivity {
         int MATCH_PARENT = ViewGroup.LayoutParams.MATCH_PARENT;
         int btnId; // ボタンのリソースIDを取得するためのint
         String resBtnName; // Btnの要素名？を入れるためのString
+
+        tv_username = (TextView) findViewById(R.id.tv_username);
 
         ScrollView scrollView = new ScrollView(this);
         scrollView.setLayoutParams(new ScrollView.LayoutParams(
@@ -121,6 +125,28 @@ public class GroupActivity extends AppCompatActivity {
             }
             Toast.makeText(GroupActivity.this, "Required Internet Connection", Toast.LENGTH_SHORT).show();
         }else{
+            //GET
+            GraphRequestAsyncTask graphRequestAsyncTaskMe = new GraphRequest(
+                    AccessToken.getCurrentAccessToken(),
+                    "/me/",
+                    null,
+                    HttpMethod.GET,
+                    new GraphRequest.Callback() {
+                        public void onCompleted(GraphResponse response) {
+                            if(response.getError() == null)
+                            {
+                                try {
+                                    JSONObject jsonObject = response.getJSONObject();
+                                    String name = jsonObject.getString("name");
+                                    tv_username.setText(name);
+                                } catch (JSONException e) {
+                                    //jsonオブジェクトの解析に失敗した場合の例外処理
+                                    e.printStackTrace();
+                                }
+                            }
+                        }
+                    }
+            ).executeAsync();
             //GET
             GraphRequestAsyncTask graphRequestAsyncTask = new GraphRequest(
                     AccessToken.getCurrentAccessToken(),

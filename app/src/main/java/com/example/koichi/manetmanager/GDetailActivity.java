@@ -35,8 +35,11 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -147,7 +150,7 @@ public class GDetailActivity extends AppCompatActivity {
         });
         // btn_Delete.setOnClickListenerここまで
 
-        // コミュニティトークン作成ボタンにクリックリスナー
+        // 端末間通信開始ボタンのクリックリスナー
         btnSetNearby.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -197,18 +200,12 @@ public class GDetailActivity extends AppCompatActivity {
                 if(posting) {
                     getFacebookPermission();
                 }
-                else {
-                    startNearbyConnections();
-                }
             }
             return;
         }
         // Android 6.0以下の場合はインストール時点で許可されているのでチェックの必要なし
         if(posting) {
             getFacebookPermission();
-        }
-        else {
-            startNearbyConnections();
         }
     }
 
@@ -223,9 +220,6 @@ public class GDetailActivity extends AppCompatActivity {
                         && grantResults[2] == PackageManager.PERMISSION_GRANTED) {
                     if(posting) {
                         getFacebookPermission();
-                    }
-                    else {
-                        startNearbyConnections();
                     }
                 } else {
                     // ユーザーが許可しなかったとき
@@ -496,19 +490,16 @@ public class GDetailActivity extends AppCompatActivity {
                                 Log.e("MYAPP", "unexpected JSON exception", e);
                             }
                             Log.d(TAG, "postToFB(): " + postid);
-                            Toast.makeText(GDetailActivity.this, "Created the Community Token", Toast.LENGTH_LONG).show();
+                            String date = getNowDate();
+                            Toast.makeText(GDetailActivity.this, date + " Created C-Token", Toast.LENGTH_LONG).show();
                             //btn_Create.setVisibility(View.GONE);
                             viewOfMaketoken(0);
-
                             //Cトークンの変更を保存
                             SharedPreferences sharedPreferences = getSharedPreferences("accounts", Context.MODE_PRIVATE); //インスタンス取得
                             SharedPreferences.Editor editor = sharedPreferences.edit(); //SharedPreferences.Editorオブジェクトを取得
-
                             //設定データへString型でArrayList<Accounts> accountGroupオブジェクトをjson型で記述
                             editor.putBoolean(group_id, true ).apply();
-
                             readFromFBgroup();
-                            startNearbyConnections();
                         }else{
                             //responseが取得できなかった場合（インターネットに接続できていない等）
                             Toast.makeText(GDetailActivity.this, "Couldn't Connect Facebook: " + response.getError().getErrorUserTitle(), Toast.LENGTH_SHORT).show();
@@ -527,10 +518,10 @@ public class GDetailActivity extends AppCompatActivity {
                 HttpMethod.DELETE,
                 new GraphRequest.Callback() {
                     public void onCompleted(GraphResponse response) {
-                        if(response.getError() == null)
-                        {
+                        if(response.getError() == null) {
                             Log.d(TAG, "deleteToFB(): " + response.getJSONObject());
-                            Toast.makeText(GDetailActivity.this, "Deleted the Community Token", Toast.LENGTH_LONG).show();
+                            String date = getNowDate();
+                            Toast.makeText(GDetailActivity.this, date + " Deleted C-Token", Toast.LENGTH_LONG).show();
                             btn_Delete.setVisibility(View.GONE);
 
                             SharedPreferences sharedPreferences = getSharedPreferences("accounts", Context.MODE_PRIVATE); //インスタンス取得
@@ -573,21 +564,6 @@ public class GDetailActivity extends AppCompatActivity {
                 Log.d(TAG, "viewOfMaketoken: selectorに予期せぬ値が代入されました");
                 Toast.makeText(GDetailActivity.this, "Error occurred", Toast.LENGTH_SHORT).show();
         }
-    }
-
-    void startNearbyConnections(){
-    /** Wakietakieへインテント飛ばそうと思って作っていたもの。要らなくなった。
-
-     **   Intent i = new Intent(Intent.ACTION_MAIN);
-     **   String ip = "0.0.0.0";
-     **   i.setAction("android.intent.category.LAUNCHER");
-     **   i.setClassName("com.google.location.nearby.apps.walkietalkie.automatic", "com.google.location.nearby.apps.walkietalkie.MainActivity");
-     **   i.putExtra("ip",ip);
-     **   i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-     **   //i.setFlags(0x10200000);
-     **   startActivity(i);
-     **/
-
     }
 
     // ネットワーク接続確認
@@ -633,5 +609,11 @@ public class GDetailActivity extends AppCompatActivity {
 
         // ConnectManageService(NearbyConnections)を起動する
         startService(new Intent(getBaseContext(),ConnectManageService.class));
+    }
+
+    public static String getNowDate(){
+        Date now = new Date(System.currentTimeMillis());
+        DateFormat formatter = new SimpleDateFormat("yyyy/MM/dd/ HH:mm.ss");
+        return formatter.format(now);
     }
 }

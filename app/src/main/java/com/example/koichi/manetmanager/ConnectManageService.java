@@ -145,6 +145,14 @@ public class ConnectManageService extends Service implements
     private final Map<String, Endpoint> mPendingConnections = new HashMap<>();
 
     /**
+     * 一度rejectされたデバイスのマップ。DiscovererがRREPをrejectされた場合にのみ追加される。
+     * このマップに含まれる&&RREPを送ろうとしているデバイスを発見した時、Discovererは接続を試みることができなくなる。
+     * その後、DiscovererがRREPメッセージを受け取ることに成功した際、このマップの中身を初期化する。
+     * keyはendpoint.getId()、値はendpoint。
+     */
+    private final Map<String, Endpoint> mRejectedConnections = new HashMap<>();
+
+    /**
      * 現在接続中のデバイスのマップ。Advertiserにとって、これは（要素数が？）非常に大きなマップになる。
      * Discovererにとって、この中身は常に１つしか存在しない。
      */
@@ -219,6 +227,8 @@ public class ConnectManageService extends Service implements
 
     private Common common;
 
+    private int repeat=0;
+
     /**
      * 他のデバイスへの接続のコールバック
      */
@@ -230,6 +240,7 @@ public class ConnectManageService extends Service implements
                             String.format(
                                     "onConnectionInitiated(endpointId=%s, endpointName=%s)",
                                     endpointId, connectionInfo.getEndpointName()));
+                    repeat = 0;
                     Endpoint endpoint = new Endpoint(endpointId, connectionInfo.getEndpointName());
                     mPendingConnections.put(endpointId, endpoint);
                     ConnectManageService.this.onConnectionInitiated(endpoint, connectionInfo);
@@ -242,7 +253,6 @@ public class ConnectManageService extends Service implements
                     // We're no longer connecting
                     Log.v(TAG,"mIsConnecting = false");
                     mIsConnecting = false;
-
                     if ( !result.getStatus().isSuccess() ){
                         Log.w(TAG,
                                 String.format(
@@ -252,8 +262,13 @@ public class ConnectManageService extends Service implements
                         );
                         builder.setContentText("onConnectionResult: Connection failed.");
                         mNM.notify(1, builder.build());
-
-                        onConnectionFailed(mPendingConnections.remove(endpointId));
+                        if(mIsAdvertising == false) {
+                            if(result.getStatus().getStatusCode() == 8004 ){
+                                //Rejectされた相手をmRejectedConnectionsマップに追加する
+                                mRejectedConnections.put(endpointId, mPendingConnections.get(endpointId));
+                            }
+                            onConnectionFailed(mPendingConnections.remove(endpointId));
+                        }
                     }else{
                         connectedToEndpoint(mPendingConnections.remove(endpointId));
                     }
@@ -438,6 +453,7 @@ public class ConnectManageService extends Service implements
         //messageBufferに文字列を登録してメッセージ作成に移行
         if(intent.getStringExtra("textMessage") != null){
             messageBuffer = intent.getStringExtra("textMessage");
+            Toast.makeText(ConnectManageService.this, "textMessage is " + messageBuffer, Toast.LENGTH_LONG).show();
             Log.d(TAG, "onStartCommand: textMessage is "+ messageBuffer);
             //デスティネーションアドレスがKeyの経路表は存在するか？
             if(mRouteLists.containsKey( mDestinationAddress ) ){
@@ -670,7 +686,7 @@ public class ConnectManageService extends Service implements
                         //一致しない
                         Log.d(TAG,String.format("onConnectionInitiated: NextHopAddress != endpoint's Address"));
                         Log.d(TAG,String.format("NextHopAddress = "+ mRouteLists.get( sendingPayload.getSourceAddress() ).getHopAdd() ) );
-                        Log.d(TAG,String.format("NextHopAddress = "+ mRouteLists.get( endpoint.getName() ) ) );
+                        Log.d(TAG,String.format("endpoint's Address = "+ mRouteLists.get( endpoint.getName() ) ) );
                         rejectConnection(endpoint);
                     }
                 }else{
@@ -807,6 +823,8 @@ public class ConnectManageService extends Service implements
                     setAdvState(adv_State.REQUEST);
                 }else if("2".equals( receivedPayload.getST(0) ) ){
                     Log.d(TAG, "onEndpointDisconnected: I am RELAY Node & received RREP");
+                    // RREPの受け取りに成功したのでmRejectConnectionsを初期化
+                    mRejectedConnections.clear();
                     // RREPにおける経路表構築
                     // 次ホップアドレス = メッセージを送ってきた相手のアドレス
                     mRouteLists.put( receivedPayload.getST(2),
@@ -867,6 +885,8 @@ public class ConnectManageService extends Service implements
             case SOURCE:
                 Log.d(TAG,"onEndpointDisconnected: I am sourceNode & Received RREP");
                 // ソースノード、RREQメッセージは受け取らない（はず）
+                // RREPの受け取りに成功したのでmRejectConnectionsを初期化
+                mRejectedConnections.clear();
                 // RREPにおける経路表構築
                 // 次ホップアドレス = メッセージを送ってきた相手のアドレス
                 mRouteLists.put( receivedPayload.getST(2),
@@ -953,20 +973,18 @@ public class ConnectManageService extends Service implements
         builder.setContentText("onConnectionFailed: " + endpoint.getName());
         mNM.notify(1, builder.build());
         //advとdisを停止する（が、条件分岐の都合上Stateには影響させない）
-        //stopAdvertising();
-        //stopWaitByDiscovering();
+        stopAdvertising();
+        stopWaitByDiscovering();
         //依然探索状態であるか？（Discoverができない状況なら再試行する必要がない）
-        /*if (getDisState() == dis_State.NORMAL) {
+        if (getDisState() == dis_State.NORMAL&&getDiscoveredEndpoints().size() > 0 && repeat < 3) {
+            repeat ++;
             //（接続先候補を削った場合を含めて）DiscoveredEndpointsマップが空ではないか？
-            if(getDiscoveredEndpoints().size() > 0) {
-                //DiscoveredEndpoints（接続先候補）からランダムに抽出して再試行
-                connectToEndpoint(pickRandomElem( getDiscoveredEndpoints() ) );
-            }else{
-                //Discoverを最初からやり直す
-                setDisState(dis_State.NORMAL);
-            }
-        }*/
-        setDisState(dis_State.NORMAL);
+            //DiscoveredEndpoints（接続先候補）からランダムに抽出して再試行
+            connectToEndpoint(pickRandomElem(getDiscoveredEndpoints()));
+        }else{
+            repeat = 0;
+            if(mIsDiscovering == false) setDisState(dis_State.NORMAL);
+        }
     }
 
     /** @return 現在発見されているエンドポイントのリストを返す。 */
@@ -1139,13 +1157,19 @@ public class ConnectManageService extends Service implements
                                         "onEndpointFound(endpointId=%s, serviceId=%s, endpointName=%s)",
                                         endpointId, info.getServiceId(), info.getEndpointName()));
                         // 自分と通信相手候補のServiceIdが一致しているか？
-                        if (getServiceId().equals(info.getServiceId() ) ){
+                        if ( getServiceId().equals(info.getServiceId())){
                             // ServiceIdが一致している
                             Log.d(TAG,"onEndpointFound: ServiceId = true");
                             // メッセージタイプ取得準備
                             Endpoint endpoint = new Endpoint(endpointId, info.getEndpointName());
                             String typeBuffer = endpoint.getMessageType();
-
+                            //相手が送ろうとしているのはRREP以外か？&&通信相手候補に自分がRejectされたことがないか？
+                            if("2".equals( typeBuffer ) && mRejectedConnections.containsKey(endpointId)){
+                                // 相手がRREPを送る&&相手にRejectされたことがある
+                                Log.d(TAG,"onEndpointFound: I had been rejected RREP by endpoint: " + mRejectedConnections.get(endpointId).getName());
+                                // 通信相手候補を見なかったことにする
+                                onEndpointLost(endpointId);
+                            }
                             // endpointのメッセージタイプがRREPかRREQであり、
                             // 尚且つそれが自分が直近に送ったメッセージタイプと被っていないか？
                             if(sendingPayload != null
@@ -1353,10 +1377,8 @@ public class ConnectManageService extends Service implements
                 disBuilder.setContentText("NORMAL")
                         .setColor( Color.argb(125, 0, 0, 255) );
                 mNM.notify(2, disBuilder.build());
-
                 //コミュニティトークンを持っているか確認
                 Log.d(TAG,"TokenId:" + common.getAccountGroup().get(common.getListIndex()).getTokenId() );
-
                 if(common.getAccountGroup().get(common.getListIndex()).getTokenId() != null){
                     if(!common.getAccountGroup().get(common.getListIndex()).getTokenId().isEmpty()) {
                         //あるならDiscover開始してAdvertiseを待つ
@@ -1511,7 +1533,7 @@ public class ConnectManageService extends Service implements
                 //これ以降はSENDメッセージと同様の動作のため、breakしない
             case "4":
                 Log.d(TAG, "onPayloadReceivedByDiscoverer: message will be replied");
-                // SENDメッセージを受信 → Payloadをそのまま送り返す
+                // メッセージを受信 → Payloadをそのまま送り返す
                 Nearby.Connections.sendPayload(mGoogleApiClient,endpoint.getId(),payload)
                         .setResultCallback(
                                 new ResultCallback<Status>() {
@@ -2021,7 +2043,7 @@ public class ConnectManageService extends Service implements
          * SocialDTNManagerに関するLogcatを取得する
          */
         Log.d( TAG, filename.getAbsolutePath() );
-        if(Build.VERSION.SDK_INT > 19)
+        if(Build.VERSION.SDK_INT > 23)
         {
             Process process =null;
             String cmd = "logcat SocialDTNManager:V *:S -v time -f " + filename.getAbsolutePath() + " -d";
@@ -2046,18 +2068,7 @@ public class ConnectManageService extends Service implements
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-        }else{
-            Process process =null;
-            String cmd = "logcat SocialDTNManager:V *:S -v time -f " + filename.getAbsolutePath() + " -d";
-            try {
-                //filenameにLogcatを出力する
-                process = Runtime.getRuntime().exec(cmd);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            Log.d(TAG, "logcat outputted: " + filename.getName());
         }
-
     }
     //TODO: 自端末のMBODを減少させるメソッドが要る？
 }
