@@ -1547,7 +1547,7 @@ public class ConnectManageService extends Service implements
                                                             ConnectManageService.toString(status)
                                                     )
                                             );
-                                            builder.setContentText("onReceiveByDiscoverer: sendPayload failed.");
+                                            builder.setContentText("sendPayload (Reply) failed.");
                                             mNM.notify(1, builder.build());
                                         }
                                     }
@@ -1574,15 +1574,13 @@ public class ConnectManageService extends Service implements
                             public void onResult(@NonNull Status status) {
                                 Log.d(TAG, "Received");
                                 if (!status.isSuccess()) {
-                                    Log.d(TAG, "Nearby.Connections.sendPayload: mIsReceiving = false");
                                     //sendPayloadの送信に失敗したとき
                                     Log.w(TAG,
                                             String.format(
-                                                    "sendPayload failed. %s",
-                                                    ConnectManageService.toString(status)
+                                                    "sendPayload failed" + ConnectManageService.toString(status)
                                             )
                                     );
-                                    builder.setContentText("onReceiveByDiscoverer: sendPayload failed.");
+                                    builder.setContentText("sendPayload (PictReply) failed.");
                                     mNM.notify(1, builder.build());
                                 }
                             }
