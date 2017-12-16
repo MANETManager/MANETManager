@@ -251,7 +251,6 @@ public class ConnectManageService extends Service implements
                 public void onConnectionResult(String endpointId, ConnectionResolution result) {
                     Log.d(TAG, String.format("onConnectionResponse(endpointId=%s, result=%s)", endpointId, result));
                     // We're no longer connecting
-                    Log.v(TAG,"mIsConnecting = false");
                     mIsConnecting = false;
                     if ( !result.getStatus().isSuccess() ){
                         Log.w(TAG,
@@ -265,6 +264,7 @@ public class ConnectManageService extends Service implements
                         if(mIsAdvertising == false) {
                             if(result.getStatus().getStatusCode() == 8004 ){
                                 //Rejectされた相手をmRejectedConnectionsマップに追加する
+                                Log.d(TAG,"put RejectedConnections:" + endpointId);
                                 mRejectedConnections.put(endpointId, mPendingConnections.get(endpointId));
                             }
                             onConnectionFailed(mPendingConnections.remove(endpointId));
@@ -316,8 +316,9 @@ public class ConnectManageService extends Service implements
                     Log.d(TAG,
                             String.format(
                                     "onPayloadTransferUpdateByDiscoverer(endpointId=%s, %sper, payloadId=%s, state=%s )", endpointId, i, update.getPayloadId(), update.getStatus() ));
-
+                    //statusがSUCCESS（送信完了）なら
                     if (update.getStatus() == PayloadTransferUpdate.Status.SUCCESS){
+                        //メッセージを受け取り始めた時にPayloadはマップに保存されているか？
                         if(incomingPayloads.containsKey( update.getPayloadId() )) {
                             Log.d(TAG, "onPayloadTransferUpdateByDiscoverer: get incomingPayloads");
                             Payload payloadBuffer = incomingPayloads.remove(update.getPayloadId());
@@ -499,7 +500,11 @@ public class ConnectManageService extends Service implements
                     pictPayload = null;
                     pictMessage = null;
                     mIsReceiving = false;
-                    setDisState(dis_State.NORMAL);
+                    if(mRejectedConnections.isEmpty() == false) mRejectedConnections.clear();
+                    if(mDiscoveredEndpoints.isEmpty() == false) mDiscoveredEndpoints.clear();
+                    if(mEstablishedConnections.isEmpty() == false)  mEstablishedConnections.clear();
+                    if(mPendingConnections.isEmpty() == false)  mPendingConnections.clear();
+                    if(mIsDiscovering == false) setDisState(dis_State.NORMAL);
                     setAdvState(adv_State.STOP);
                     makeLogcat();
                     Toast.makeText(
@@ -975,8 +980,18 @@ public class ConnectManageService extends Service implements
         //advとdisを停止する（が、条件分岐の都合上Stateには影響させない）
         stopAdvertising();
         stopWaitByDiscovering();
+        //そもそもお前通信Rejectされてはないか？
+        if(mRejectedConnections.isEmpty() == false) {
+            //しかも元発見相手はそこに含まれていたのではないか？
+            if(mRejectedConnections.containsKey(endpoint.getId()) == true){
+                Log.d(TAG,"mRejectedConnections.containsKey(endpoint.getId()) == true");
+                //Rejectされたリストにendpointが含まれているので通信再試行なんてしない
+                if(mIsDiscovering == false) setDisState(dis_State.NORMAL);
+            }
+        }
         //依然探索状態であるか？（Discoverができない状況なら再試行する必要がない）
         if (getDisState() == dis_State.NORMAL&&getDiscoveredEndpoints().size() > 0 && repeat < 3) {
+
             repeat ++;
             //（接続先候補を削った場合を含めて）DiscoveredEndpointsマップが空ではないか？
             //DiscoveredEndpoints（接続先候補）からランダムに抽出して再試行
@@ -1159,7 +1174,6 @@ public class ConnectManageService extends Service implements
                         // 自分と通信相手候補のServiceIdが一致しているか？
                         if ( getServiceId().equals(info.getServiceId())){
                             // ServiceIdが一致している
-                            Log.d(TAG,"onEndpointFound: ServiceId = true");
                             // メッセージタイプ取得準備
                             Endpoint endpoint = new Endpoint(endpointId, info.getEndpointName());
                             String typeBuffer = endpoint.getMessageType();
@@ -1179,9 +1193,9 @@ public class ConnectManageService extends Service implements
                                 // 被っているので通信相手候補を見なかったことにする
                                 onEndpointLost(endpointId);
                             }else{
-                                Log.d(TAG,"onEndpointFound: endpoint's messageType = " + endpoint.getMessageType() );
                                 if(sendingPayload != null) {
-                                    Log.d(TAG,"onEndpointFound: my last messageType = " + sendingPayload.getMessageType() );
+                                    Log.e(TAG,"onEndpointFound: my last messageType = " + sendingPayload.getMessageType() );
+                                    return;
                                 }
                                 switch(endpoint.getMessageType() ){
                                     case "1":
@@ -1297,7 +1311,6 @@ public class ConnectManageService extends Service implements
         }
         Log.v(TAG,"Sending a connection request to " + endpoint);
         // 自身が接続試行中であることを設定するため、重複して何度も接続をすることはない。
-        Log.v(TAG,"mIsConnecting = true");
         mIsConnecting = true;
         builder.setContentText("Request Connection to " + endpoint);
         mNM.notify(1, builder.build());
@@ -1318,7 +1331,6 @@ public class ConnectManageService extends Service implements
                                     );
                                     builder.setContentText("connectToEndpoint: Request failed.");
                                     mNM.notify(1, builder.build());
-                                    Log.v(TAG,"mIsConnecting = false");
                                     mIsConnecting = false;
                                     onConnectionFailed(endpoint);
                                 }else{
@@ -1351,7 +1363,6 @@ public class ConnectManageService extends Service implements
      * @param newState 新しい状態。この状態のUIを準備する。
      */
     private void onDisStateChanged(dis_State oldState, dis_State newState) {
-        Log.d(TAG, "onDisStateChanged");
         switch (newState) {
             case STOP:
                 //TODO: STOPになっていてサービス起動中にコミュニティトークン取得した場合
@@ -1378,7 +1389,6 @@ public class ConnectManageService extends Service implements
                         .setColor( Color.argb(125, 0, 0, 255) );
                 mNM.notify(2, disBuilder.build());
                 //コミュニティトークンを持っているか確認
-                Log.d(TAG,"TokenId:" + common.getAccountGroup().get(common.getListIndex()).getTokenId() );
                 if(common.getAccountGroup().get(common.getListIndex()).getTokenId() != null){
                     if(!common.getAccountGroup().get(common.getListIndex()).getTokenId().isEmpty()) {
                         //あるならDiscover開始してAdvertiseを待つ
@@ -1387,7 +1397,7 @@ public class ConnectManageService extends Service implements
                     }
                 }else{
                     //ないならSTOPに戻す
-                    Log.d(TAG,"TokenId = null" );
+                    Log.e(TAG,"TokenId = null" );
                     setDisState(dis_State.STOP);
                 }
                 break;
@@ -1428,7 +1438,6 @@ public class ConnectManageService extends Service implements
      * @param newState 新しい状態。この状態のUIを準備する。
      */
     private void onAdvStateChanged(adv_State oldState, adv_State newState) {
-        Log.d(TAG, "onAdvStateChanged");
         // Adv_Stateに関する通知を切り替え、
         switch (newState) {
             case STOP:
@@ -1572,7 +1581,6 @@ public class ConnectManageService extends Service implements
                         new ResultCallback<Status>() {
                             @Override
                             public void onResult(@NonNull Status status) {
-                                Log.d(TAG, "Received");
                                 if (!status.isSuccess()) {
                                     //sendPayloadの送信に失敗したとき
                                     Log.w(TAG,
@@ -1582,6 +1590,8 @@ public class ConnectManageService extends Service implements
                                     );
                                     builder.setContentText("sendPayload (PictReply) failed.");
                                     mNM.notify(1, builder.build());
+                                }else{
+                                    Log.d(TAG,"Reply (FILE) sent");
                                 }
                             }
                         });
