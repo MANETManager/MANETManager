@@ -1180,7 +1180,7 @@ public class ConnectManageService extends Service implements
                             // ①相手が送ろうとしているのはRREP以外か？&&通信相手候補に自分がRejectされたことがないか？
                             // ②endpointのメッセージタイプがRREPかRREQであり、
                             // 尚且つそれが自分が直近に送ったメッセージタイプと被っていないか？
-                            if("2".equals( typeBuffer ) || "4".equals( typeBuffer ) && mRejectedConnections.containsKey(endpointId)){
+                            if( ( "2".equals( typeBuffer ) || "4".equals( typeBuffer ) ) && mRejectedConnections.containsKey(endpointId)){
                                 // ①相手がRREPまたはSENDを送る&&相手にRejectされたことがある
                                 Log.d(TAG,"onEndpointFound: I had been rejected RREP by endpoint: " + mRejectedConnections.get(endpointId).getName());
                                 // 通信相手候補を見なかったことにする
