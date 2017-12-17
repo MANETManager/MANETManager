@@ -592,7 +592,7 @@ public class ConnectManageService extends Service implements
             //相手が送ろうとしているメッセージがSENDかRERRならすぐに受け入れる
             switch(endpoint.getMessageType()){
                 case "4":
-                    //経路構築後のメッセージを受信予定
+                    //SENDメッセージを受信予定
                     Log.d(TAG, "onConnectionInitiated: I'm DELIVER Node");
                     myRole = isMyRole.DELIVER;
                     acceptConnectionByDiscoverer(endpoint);
@@ -1180,8 +1180,8 @@ public class ConnectManageService extends Service implements
                             // ①相手が送ろうとしているのはRREP以外か？&&通信相手候補に自分がRejectされたことがないか？
                             // ②endpointのメッセージタイプがRREPかRREQであり、
                             // 尚且つそれが自分が直近に送ったメッセージタイプと被っていないか？
-                            if("2".equals( typeBuffer ) && mRejectedConnections.containsKey(endpointId)){
-                                // ①相手がRREPを送る&&相手にRejectされたことがある
+                            if("2".equals( typeBuffer ) || "4".equals( typeBuffer ) && mRejectedConnections.containsKey(endpointId)){
+                                // ①相手がRREPまたはSENDを送る&&相手にRejectされたことがある
                                 Log.d(TAG,"onEndpointFound: I had been rejected RREP by endpoint: " + mRejectedConnections.get(endpointId).getName());
                                 // 通信相手候補を見なかったことにする
                                 onEndpointLost(endpointId);
