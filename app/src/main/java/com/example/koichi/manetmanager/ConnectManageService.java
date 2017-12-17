@@ -1178,21 +1178,28 @@ public class ConnectManageService extends Service implements
                             Endpoint endpoint = new Endpoint(endpointId, info.getEndpointName());
                             String typeBuffer = endpoint.getMessageType();
                             // ①相手が送ろうとしているのはRREP以外か？&&通信相手候補に自分がRejectされたことがないか？
-                            // ②endpointのメッセージタイプがRREPかRREQであり、
+                            // ②sendingPayloadの受け取りに失敗していないか？
+                            // ③endpointのメッセージタイプがRREPかRREQであり、
                             // 尚且つそれが自分が直近に送ったメッセージタイプと被っていないか？
                             if("2".equals( typeBuffer ) && mRejectedConnections.containsKey(endpointId)){
                                 // ①相手がRREPを送る&&相手にRejectされたことがある
                                 Log.d(TAG,"onEndpointFound: I had been rejected RREP by endpoint: " + mRejectedConnections.get(endpointId).getName());
                                 // 通信相手候補を見なかったことにする
                                 onEndpointLost(endpointId);
+                            }else if(sendingPayload == null) {
+                                //sendingPayloadの受け取りに失敗している
+                                Log.e(TAG,"onEndpointFound: Failed to receive sendingPayload");
+                                builder.setContentText("Failed to receive sendingPayload");
+                                mNM.notify(1, builder.build());
+                                return;
                             }else if(sendingPayload != null
                                     && !"3".equals( typeBuffer )
                                     && sendingPayload.getMessageType().equals( typeBuffer ) ){
-                                // ②メッセージタイプが被っているので通信相手候補を見なかったことにする
                                 Log.w(TAG,"onEndpointFound: endpoint's messageType == my last messageType");
+                                // メッセージタイプが被っているので通信相手候補を見なかったことにする
                                 onEndpointLost(endpointId);
                             }else{
-                                // ①か②の条件に当てはまらない場合
+                                // ①～③の条件に当てはまらない場合
                                 // 相手の送ろうとしているメッセージタイプに応じて振る舞いを変える
                                 switch(endpoint.getMessageType() ){
                                     case "1":
