@@ -3,6 +3,8 @@ package com.example.koichi.manetmanager;
 
 import android.Manifest;
 import android.app.AlertDialog;
+import android.app.ActivityManager;
+import android.app.ActivityManager.RunningServiceInfo;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -40,6 +42,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.List;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -162,8 +165,25 @@ public class GDetailActivity extends AppCompatActivity {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
                                 // OK button pressed
-                                // いま表示しているコミュニティトークンを保存する
-                                preferToken();
+                                // サービスが実行中かチェック
+                                ActivityManager am = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
+                                List<RunningServiceInfo> listServiceInfo = am.getRunningServices(Integer.MAX_VALUE);
+                                boolean found = false;
+                                // クラス名を比較
+                                for (RunningServiceInfo curr : listServiceInfo){
+                                    if (curr.service.getClassName().equals(ConnectManageService.class.getName())){
+                                        // ConnectManageServiceが実行中である
+                                        Toast.makeText(GDetailActivity.this, "Service will be stopped", Toast.LENGTH_SHORT).show();
+                                        found = true;
+                                        stopService(new Intent(getBaseContext(),ConnectManageService.class));
+                                        break;
+                                    }
+                                }
+                                if (found == false) {
+                                    // ConnectManageServiceが実行中ではない
+                                    // いま表示しているコミュニティトークンを保存し、ConnectManagerServiceを開始する
+                                    preferToken();
+                                }
                             }
                         })
                         .setNegativeButton("Disagree", null)

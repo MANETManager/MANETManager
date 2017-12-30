@@ -538,6 +538,7 @@ public class ConnectManageService extends Service implements
         if (mGoogleApiClient != null && mGoogleApiClient.isConnected()) {
             mGoogleApiClient.disconnect();
         }
+        mNM.cancelAll();
         Log.d(TAG, "onDestroy");
     }
 
