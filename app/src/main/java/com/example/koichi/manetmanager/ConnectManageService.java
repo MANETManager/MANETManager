@@ -923,41 +923,49 @@ public class ConnectManageService extends Service implements
                     //Log.d(TAG,"onEndpointDisconnected: named payloadFile:" + payloadFile.getName() );
                     pictMessage = Uri.fromFile(pictPayload.asFile().asJavaFile());
                 }
-                // SENDメッセージを受け取っている + 自分がソースノードもしくはデスティネーションノードか？
-                if( receivedPayload != null && receivedPayload.getST(0).equals( "4" )
-                        && mDestinationAddress.equals(mName)
-                        || mName.equals( accountList.get(common.getListIndex()).getSourceAddress() )){
-                    // 自分がSENDメッセージを受け取っているソースノードもしくはデスティネーションノードなので
-                    // メッセージの中身（textMessage）をダイアログで表示
-                    Log.d(TAG,"onEndpointDisconnected: メッセージの中身（textMessage）をダイアログで表示");
-                    Intent i = new Intent(ConnectManageService.this, CallDialogActivity.class);
-                    i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                            .putExtra("textMessage", receivedPayload.getST(6) );
-                    if(pictPayload != null){
-                        //Log.d(TAG,"onEndpointDisconnected: pictPayload size is " + pictPayload.asFile().getSize());
-                        Uri uri = pictMessage;
-                        Log.d(TAG,"onEndpointDisconnected: pictMessage is " + uri.toString() );
-                        i.setData(uri);
-                    }
-                    getApplicationContext().startActivity(i);
-                    // メッセージ受信完了。念のためにAdvertiseを終了する
-                    setDisState(dis_State.NORMAL);
-                    setAdvState(adv_State.STOP);
-                }else{
-                    // SENDメッセージを作成する。
-                    if(pictPayload != null) {
-                        try {
-                            createSENDPictMessage(receivedPayload.st[2], pictMessage);
-                        } catch (FileNotFoundException e) {
-                            e.printStackTrace();
+                if(receivedPayload != null){
+                    // SENDメッセージを受け取っている + 自分がソースノードもしくはデスティネーションノードか？
+                    if( receivedPayload.getST(0).equals( "4" )
+                            && ( mDestinationAddress.equals(mName)
+                            || mName.equals( accountList.get(common.getListIndex()).getSourceAddress() ) )
+                            ){
+                        // 自分がSENDメッセージを受け取っているソースノードもしくはデスティネーションノードなので
+                        // メッセージの中身（textMessage）をダイアログで表示
+                        Log.d(TAG,"onEndpointDisconnected: メッセージの中身（textMessage）をダイアログで表示");
+                        Intent i = new Intent(ConnectManageService.this, CallDialogActivity.class);
+                        i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                                .putExtra("textMessage", receivedPayload.getST(6) );
+                        if(pictPayload != null){
+                            //Log.d(TAG,"onEndpointDisconnected: pictPayload size is " + pictPayload.asFile().getSize());
+                            Uri uri = pictMessage;
+                            Log.d(TAG,"onEndpointDisconnected: pictMessage is " + uri.toString() );
+                            i.setData(uri);
                         }
+                        getApplicationContext().startActivity(i);
+                        // メッセージ受信完了。念のためにAdvertiseを終了する
+                        setDisState(dis_State.NORMAL);
+                        setAdvState(adv_State.STOP);
                     }else{
-                        createSENDMessage( receivedPayload.st[2] );
+                        // SENDメッセージを作成する。
+                        if(pictPayload != null) {
+                            try {
+                                createSENDPictMessage(receivedPayload.st[2], pictMessage);
+                            } catch (FileNotFoundException e) {
+                                e.printStackTrace();
+                            }
+                        }else{
+                            createSENDMessage( receivedPayload.st[2] );
+                        }
                     }
+                }else{
+                    //何かメッセージを受け取っていないのにここを実行しているのでエラー
+                    Log.e(TAG,"onEndpointDisconnected: fatal exception (without receivePayload)" );
+                    return;
                 }
                 break;
             default:
                 Log.e(TAG,"onEndpointDisconnected: fatal exception (cannot understand myRole:" + myRole + ")" );
+                return;
                 // ここに来るのはエラーかAdvertiser？
         }
         Toast.makeText(
