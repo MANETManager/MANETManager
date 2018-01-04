@@ -13,6 +13,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.textservice.TextInfo;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -42,7 +43,8 @@ public class GroupActivity extends AppCompatActivity {
     String [] group_name = new String[group_MAX];
     String [] group_id = new String[group_MAX];
     Button btnGroup[]; //ボタン:メンバー変数
-    private static final String TAG = "GroupActivity";
+    private TextView tv_username;
+    private static final String TAG = "SocialDTNManager";
 
     private Common common;
 
@@ -56,6 +58,8 @@ public class GroupActivity extends AppCompatActivity {
         int MATCH_PARENT = ViewGroup.LayoutParams.MATCH_PARENT;
         int btnId; // ボタンのリソースIDを取得するためのint
         String resBtnName; // Btnの要素名？を入れるためのString
+
+        tv_username = (TextView) findViewById(R.id.tv_username);
 
         ScrollView scrollView = new ScrollView(this);
         scrollView.setLayoutParams(new ScrollView.LayoutParams(
@@ -98,7 +102,7 @@ public class GroupActivity extends AppCompatActivity {
                     }else{
                         // ネットワーク接続が確認できなければボタンによる動作を実行しない
                         Toast.makeText(GroupActivity.this,
-                                "インターネットへの接続が必要です", Toast.LENGTH_SHORT).show();
+                                "Required Internet Connection", Toast.LENGTH_SHORT).show();
                     }
                 }
             });
@@ -113,57 +117,88 @@ public class GroupActivity extends AppCompatActivity {
         // スーパークラスのやることは済ませておく
         super.onResume();
 
-        //GET
-        GraphRequestAsyncTask graphRequestAsyncTask = new GraphRequest(
-                AccessToken.getCurrentAccessToken(),
-                "/me/groups",
-                null,
-                HttpMethod.GET,
-                new GraphRequest.Callback() {
-                    public void onCompleted(GraphResponse response) {
-                        try {
-                            //jsonオブジェクトを生成
-                            JSONObject FBjson = response.getJSONObject();
-                            //出てくるdata配列、pagingオブジェクトのうちdata配列を抽出
-                            JSONArray itemArray = FBjson.getJSONArray("data");
-
-                            //data配列内の全ての書き込み情報オブジェクトを取り出す
-                            int count = itemArray.length();
-                            JSONObject[] groupObject = new JSONObject[count];
-                            for (int i=0; i<count; i++){
-                                groupObject[i] = itemArray.getJSONObject(i);
-                            }
-
-                            // data配列の書き込み情報オブジェクト群のうちnameデータ・idデータを取り出す
-                            for (group_num=0; group_num<groupObject.length && group_num < group_MAX; group_num++){
-                                //nameデータ・idデータを持っていない書き込み情報オブジェクトを排除する
-                                if(groupObject[group_num].has("name") == true && groupObject[group_num].has("id") == true) {
-                                    // (i+1)番目の書き込みについて処理を行う
-                                    // グループ名とグループidを取得
-                                    group_name[group_num] = groupObject[group_num].getString("name");
-                                    group_id[group_num] = groupObject[group_num].getString("id");
-                                }else {
-                                    // 書き込みにname・idが存在しないのでスルーする
+        if(netWorkCheck( getApplication() ) == false ){
+            for(int j=0;j<group_MAX;j++){
+                if (btnGroup[j].getVisibility() != View.INVISIBLE) {
+                    btnGroup[j].setVisibility(View.INVISIBLE);
+                }
+            }
+            Toast.makeText(GroupActivity.this, "Required Internet Connection", Toast.LENGTH_SHORT).show();
+        }else{
+            //GET
+            GraphRequestAsyncTask graphRequestAsyncTaskMe = new GraphRequest(
+                    AccessToken.getCurrentAccessToken(),
+                    "/me/",
+                    null,
+                    HttpMethod.GET,
+                    new GraphRequest.Callback() {
+                        public void onCompleted(GraphResponse response) {
+                            if(response.getError() == null)
+                            {
+                                try {
+                                    JSONObject jsonObject = response.getJSONObject();
+                                    String name = jsonObject.getString("name");
+                                    tv_username.setText(name);
+                                } catch (JSONException e) {
+                                    //jsonオブジェクトの解析に失敗した場合の例外処理
+                                    e.printStackTrace();
                                 }
                             }
-
-                            // setText変更した分を再描画
-                            for(int i=0;i<group_num;i++) {
-                                btnGroup[i].setText(group_name[i]);
-                            }
-                            // 取得したグループ名の数よりも大きい番号のグループのボタンは不可視にする
-                            for(int j=group_num;j<group_MAX;j++){
-                                if (btnGroup[j].getVisibility() != View.INVISIBLE) {
-                                    btnGroup[j].setVisibility(View.INVISIBLE);
-                                }
-                            }
-                        } catch (JSONException e) {
-                            //jsonオブジェクトの解析に失敗した場合の例外処理
-                            e.printStackTrace();
                         }
                     }
-                }
-        ).executeAsync();
+            ).executeAsync();
+            //GET
+            GraphRequestAsyncTask graphRequestAsyncTask = new GraphRequest(
+                    AccessToken.getCurrentAccessToken(),
+                    "/me/groups",
+                    null,
+                    HttpMethod.GET,
+                    new GraphRequest.Callback() {
+                        public void onCompleted(GraphResponse response) {
+                            try {
+                                //jsonオブジェクトを生成
+                                JSONObject FBjson = response.getJSONObject();
+                                //出てくるdata配列、pagingオブジェクトのうちdata配列を抽出
+                                JSONArray itemArray = FBjson.getJSONArray("data");
+
+                                //data配列内の全ての書き込み情報オブジェクトを取り出す
+                                int count = itemArray.length();
+                                JSONObject[] groupObject = new JSONObject[count];
+                                for (int i=0; i<count; i++){
+                                    groupObject[i] = itemArray.getJSONObject(i);
+                                }
+
+                                // data配列の書き込み情報オブジェクト群のうちnameデータ・idデータを取り出す
+                                for (group_num=0; group_num<groupObject.length && group_num < group_MAX; group_num++){
+                                    //nameデータ・idデータを持っていない書き込み情報オブジェクトを排除する
+                                    if(groupObject[group_num].has("name") == true && groupObject[group_num].has("id") == true) {
+                                        // (i+1)番目の書き込みについて処理を行う
+                                        // グループ名とグループidを取得
+                                        group_name[group_num] = groupObject[group_num].getString("name");
+                                        group_id[group_num] = groupObject[group_num].getString("id");
+                                    }else {
+                                        // 書き込みにname・idが存在しないのでスルーする
+                                    }
+                                }
+
+                                // setText変更した分を再描画
+                                for(int i=0;i<group_num;i++) {
+                                    btnGroup[i].setText(group_name[i]);
+                                }
+                                // 取得したグループ名の数よりも大きい番号のグループのボタンは不可視にする
+                                for(int j=group_num;j<group_MAX;j++){
+                                    if (btnGroup[j].getVisibility() != View.INVISIBLE) {
+                                        btnGroup[j].setVisibility(View.INVISIBLE);
+                                    }
+                                }
+                            } catch (JSONException e) {
+                                //jsonオブジェクトの解析に失敗した場合の例外処理
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+            ).executeAsync();
+        }
     }
 
     // ネットワーク接続確認

@@ -63,20 +63,23 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        FacebookSdk.sdkInitialize(getApplicationContext());
 
+        try {
+            PackageInfo info = getPackageManager().getPackageInfo(
+                    "com.example.koichi.manetmanager",
+                    PackageManager.GET_SIGNATURES);
+        } catch (PackageManager.NameNotFoundException e) {
+
+        }
         setContentView(R.layout.activity_main);
 
         //commonクラスで宣言したグローバル関数の取得
         common = (Common)this.getApplication();
-
-
         //ユーザー名とパスワード認証
         Button authentication_Button = (Button) findViewById(R.id.authentication);
         authentication_Button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                //TODO: Facebookへの手動ログイン実装
                 //ユーザー名とパスワードの取得
                 value_username = (EditText)findViewById(R.id.value_username);
                 value_password = (EditText)findViewById(R.id.value_password);
@@ -138,7 +141,6 @@ public class MainActivity extends AppCompatActivity {
                 startActivity(intent);
             }
         });
-
 
         //FB認証
         /*ログインボタン設置、要求するパーミッションの設定*/

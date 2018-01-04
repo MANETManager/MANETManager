@@ -52,5 +52,4 @@ public class Common extends Application {
         macAddress = null;
         listIndex = 0;
     }
-
 }

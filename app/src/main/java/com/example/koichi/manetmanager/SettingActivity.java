@@ -22,7 +22,6 @@ import com.google.gson.Gson;
 import static java.lang.Double.compare;
 import static java.lang.Double.parseDouble;
 
-
 public class SettingActivity extends AppCompatActivity {
 
     private TextView mbod;
@@ -85,7 +84,6 @@ public class SettingActivity extends AppCompatActivity {
                 dialog.setTitle("Please enter MBoD");
                 dialog.setView(mbodView);
 
-
                 // OKボタンの設定
                 dialog.setPositiveButton("OK", new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int whichButton) {
@@ -117,8 +115,6 @@ public class SettingActivity extends AppCompatActivity {
             }
         });
 
-
-
         //MACアドレス入力
         macAddress_Button.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -135,7 +131,6 @@ public class SettingActivity extends AppCompatActivity {
                 dialog.setTitle("Please Enter MAC Address (xx:xx:xx:xx:xx:xx)");
                 dialog.setView(macAddressView);
 
-
                 // OKボタンの設定
                 dialog.setPositiveButton("OK", new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int whichButton) {
@@ -143,7 +138,6 @@ public class SettingActivity extends AppCompatActivity {
                         // 正しい方
                         //EditText value_mtod = (EditText) mtodView.findViewById(R.id.value_mtod);
                         //mtod.setText(value_mtod.getText().toString());
-
 
                         //private宣言されたvalue_mtodを使う場合
                         setValueMacAddress((EditText) macAddressView.findViewById(R.id.value_macAddress)); //カスタムダイアログで入力された数値をvalue_mbodに代入
@@ -154,19 +148,15 @@ public class SettingActivity extends AppCompatActivity {
                         common.setMacAddress(string_macAddress); //グローバル関数に代入
                     }
                 });
-
                 // キャンセルボタンの設定
                 dialog.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int whichButton) {
                         // キャンセルボタンをタップした時の処理をここに記述
                     }
                 });
-
                 dialog.show();
             }
         });
-
-
 
         //ログアウト
         //TODO: ログアウト時にCトークン関係の変数を設定データに保存する動作の実装
@@ -195,9 +185,7 @@ public class SettingActivity extends AppCompatActivity {
                 //intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 startActivity(intent);
-
             }
         });
     }
 }
-
